@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Attestation de congé — {{ employee.full_name }}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1a1a1a; margin: 40px; }
+  h1 { font-size: 18px; text-transform: uppercase; text-align: center; margin-bottom: 4px; }
+  .numero { text-align: center; color: #555; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  td, th { padding: 6px 8px; border: 1px solid #ccc; text-align: left; }
+  th { background: #f4f4f4; width: 40%; }
+  .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
+  .signatures div { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 8px; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+  <h1>Attestation de congé</h1>
+  <p class="numero">N° {{ numero }}</p>
+
+  <table>
+    <tr><th>Collaborateur</th><td>{{ employee.full_name }}</td></tr>
+    <tr><th>Matricule</th><td>{{ employee.matricule or "—" }}</td></tr>
+    <tr><th>Département</th><td>{{ employee.department.nom if employee.department else "—" }}</td></tr>
+    <tr><th>Type de congé</th><td>{{ entry.leave_type.libelle }}</td></tr>
+    <tr><th>Période</th><td>Du {{ entry.date_debut.strftime("%d/%m/%Y") }} au {{ entry.date_fin.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><th>Nombre de jours</th><td>{{ entry.nb_jours }}</td></tr>
+    <tr><th>Date de reprise</th><td>{{ date_retour.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><th>Jours de repos hebdomadaire inclus</th><td>{{ repos_labels or "—" }}</td></tr>
+    <tr><th>Jours fériés inclus</th><td>{{ feries_labels or "—" }}</td></tr>
+    <tr><th>Solde avant la demande</th><td>{{ solde_avant }} jour(s)</td></tr>
+    <tr><th>Solde après la demande</th><td>{{ solde_apres }} jour(s)</td></tr>
+    <tr><th>Approuvé par</th><td>{{ entry.decided_by.email if entry.decided_by else "—" }}</td></tr>
+    <tr><th>Approuvé le</th><td>{{ entry.decided_at.strftime("%d/%m/%Y") if entry.decided_at else "—" }}</td></tr>
+  </table>
+
+  <div class="signatures">
+    <div>Signature du collaborateur</div>
+    <div>Signature RH</div>
+  </div>
+</body>
+</html>
