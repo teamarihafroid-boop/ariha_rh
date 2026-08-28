@@ -36,7 +36,7 @@ Seeded logins (password `ChangeMoi123!` for all):
 
 ```bash
 cd backend
-./.venv/Scripts/python -m pytest          # 49 tests: auth, RBAC, leave business logic
+./.venv/Scripts/python -m pytest          # 65 tests: auth, RBAC, leave business logic, accrual, holidays
 ./.venv/Scripts/python -m ruff check app tests
 ./.venv/Scripts/python -m black app tests
 ```
@@ -64,6 +64,23 @@ npm run format:check    # prettier --check
   `/hr/parametres`; still requires HR approval regardless of who submitted (RESP-03).
 - Notifications on approve/reject (EMP-05), printable HTML certificate gated on approval (EMP-06/HR-19).
 - Real audit trail (`audit_logs.actor_user_id`, NOT NULL) replacing the prototype's host-PC-account bug.
+- **Solde-sufficiency check**: a request is rejected (400) if it would exceed the employee's current
+  balance for that leave type, checked per calendar year for a year-spanning request.
+- **Automatic congé-payé accrual** (`LeaveType.accrual_legal`, `leave_service.jours_acquis_legaux`):
+  "Congé payé"'s `jours_acquis` is computed from the employee's `date_embauche`, not entered manually —
+  1.5 days/month of service + a 5-year seniority bonus, capped at 30 days/year, per Morocco's Code du
+  Travail (Loi 65-99) Art. 231 & 238. **This is a real legal/financial parameter — the function's
+  docstring lists the simplifications it makes (no exclusion of unpaid-leave months, no separate
+  6-month eligibility gate, seniority-bonus proration for a partial year isn't literally spelled out in
+  the law's text). Get HR/legal sign-off before trusting this for anything beyond an operational
+  estimate**, consistent with `HR/CLAUDE.md`'s own stated principle of never silently inventing a legal
+  value. HR can no longer manually edit this balance (400 on `PUT /leave-balances`); the fix path for a
+  wrong number is correcting the employee's `date_embauche`.
+- **Moroccan public holidays**: `POST /holidays/generate-fixed?annee=` (HR only, idempotent) auto-fills
+  the 9 fixed-Gregorian-date civil holidays for a year. The mobile Islamic holidays (Aïd al-Fitr, Aïd
+  al-Adha, 1 Muharram, Aïd al-Mawlid) shift every year with the lunar calendar and can't be computed —
+  those still need manual entry via the same "Jours fériés" panel at `/hr/parametres`, once each year's
+  dates are confirmed (same deliberate limitation as the prototype's original empty-seeded holidays).
 
 ## Known gaps / next steps
 
