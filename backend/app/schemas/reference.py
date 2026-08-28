@@ -10,6 +10,7 @@ class LeaveTypeOut(BaseModel):
     libelle: str
     couleur: str
     deduit_du_solde: bool
+    accrual_legal: bool
 
     model_config = {"from_attributes": True}
 

@@ -72,6 +72,13 @@ export interface LeaveType {
   libelle: string
   couleur: string
   deduit_du_solde: boolean
+  accrual_legal: boolean
+}
+
+export interface Holiday {
+  id: number
+  date: string
+  libelle: string
 }
 
 export interface LeaveRequest {

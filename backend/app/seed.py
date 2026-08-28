@@ -5,17 +5,24 @@ Run with: python -m app.seed
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
+
 from app.core.security import hash_password
 from app.database import SessionLocal
 from app.models import Department, Employee, EmployeeStatus, LeaveType, Position, User
 from app.models.enums import UserRole
+from app.services import holiday_service
 
+# (libelle, couleur, deduit_du_solde, accrual_legal)
+# accrual_legal=True only for "Congé payé": its jours_acquis is computed
+# automatically from tenure (leave_service.jours_acquis_legaux) rather than
+# entered manually — see that function's docstring for the legal basis.
 SEED_LEAVE_TYPES = [
-    ("Congé payé", "#0288D1", True),
-    ("Récupération", "#43A047", True),
-    ("Maladie", "#FB8C00", False),
-    ("Sans solde", "#8E24AA", False),
-    ("Exceptionnel (mariage/naissance/décès)", "#546E7A", False),
+    ("Congé payé", "#0288D1", True, True),
+    ("Récupération", "#43A047", True, False),
+    ("Maladie", "#FB8C00", False, False),
+    ("Sans solde", "#8E24AA", False, False),
+    ("Exceptionnel (mariage/naissance/décès)", "#546E7A", False, False),
 ]
 
 
@@ -36,8 +43,19 @@ def run() -> None:
             db.flush()
 
         if db.query(LeaveType).count() == 0:
-            for libelle, couleur, deduit in SEED_LEAVE_TYPES:
-                db.add(LeaveType(libelle=libelle, couleur=couleur, deduit_du_solde=deduit))
+            for libelle, couleur, deduit, accrual_legal in SEED_LEAVE_TYPES:
+                db.add(
+                    LeaveType(
+                        libelle=libelle,
+                        couleur=couleur,
+                        deduit_du_solde=deduit,
+                        accrual_legal=accrual_legal,
+                    )
+                )
+            db.flush()
+        else:
+            # Backfill for a DB seeded before accrual_legal existed.
+            db.query(LeaveType).filter_by(libelle="Congé payé").update({"accrual_legal": True})
             db.flush()
 
         active_status = db.query(EmployeeStatus).filter_by(libelle="Actif").first()
@@ -79,11 +97,18 @@ def run() -> None:
                 department_id=department.id,
                 position_id=position.id,
                 status_id=active_status.id if active_status else None,
+                # Illustrative hire date so the automatic congé-payé accrual
+                # (jours_acquis_legaux) has something real to compute from.
+                date_embauche=date(2023, 3, 1),
             )
             db.add(demo_employee)
             db.flush()
 
         ensure_user("employe@arihafroid.ma", UserRole.EMPLOYEE, employee=demo_employee)
+
+        current_year = datetime.now(UTC).date().year
+        for annee in (current_year, current_year + 1):
+            holiday_service.generate_fixed_holidays(db, annee)
 
         db.commit()
         print("Seed complete: HR/DG/Employee logins ready (password: ChangeMoi123!).")

@@ -15,4 +15,9 @@ class LeaveType(Base):
     libelle: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
     couleur: Mapped[str] = mapped_column(String(20), default="#0288D1")
     deduit_du_solde: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # When True, jours_acquis for this type is computed automatically from the
+    # employee's tenure (leave_service.jours_acquis_legaux) rather than
+    # manually entered by HR — used for "Congé payé" only. See that function's
+    # docstring for the legal source and its limits.
+    accrual_legal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

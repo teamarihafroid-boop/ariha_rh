@@ -76,15 +76,23 @@ export function MyLeave() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {balances
                 .filter((b) => leaveTypes.find((t) => t.id === b.leave_type_id)?.deduit_du_solde)
-                .map((b) => (
-                  <div key={b.leave_type_id} className="rounded-md bg-slate-50 p-3">
-                    <div className="text-xs text-slate-500">{b.leave_type_libelle}</div>
-                    <div className="text-lg font-semibold text-slate-900">{b.solde} j</div>
-                    <div className="text-xs text-slate-400">
-                      {b.jours_acquis} acquis · {b.jours_pris} pris
+                .map((b) => {
+                  const type = leaveTypes.find((t) => t.id === b.leave_type_id)
+                  return (
+                    <div key={b.leave_type_id} className="rounded-md bg-slate-50 p-3">
+                      <div className="text-xs text-slate-500">{b.leave_type_libelle}</div>
+                      <div className="text-lg font-semibold text-slate-900">{b.solde} j</div>
+                      <div className="text-xs text-slate-400">
+                        {b.jours_acquis} acquis · {b.jours_pris} pris
+                      </div>
+                      {type?.accrual_legal && (
+                        <div className="mt-1 text-[10px] text-blue-600">
+                          Calculé automatiquement selon l'ancienneté
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
             </div>
           </Card>
 

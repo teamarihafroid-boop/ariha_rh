@@ -9,6 +9,8 @@ os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 os.environ["SESSION_SECRET"] = "test-secret-not-for-production"
 os.environ["COOKIE_SECURE"] = "false"
 
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -19,6 +21,7 @@ from app.database import Base, get_db
 from app.main import app
 from app.models import Department, Employee, EmployeeStatus, LeaveType, User
 from app.models.enums import UserRole
+from app.services.leave_service import get_or_create_balance
 from app.services.session_store import _redis as redis_client
 
 engine = create_engine(os.environ["DATABASE_URL"])
@@ -194,6 +197,18 @@ def colleague_under_responsable_user(db, colleague_under_responsable) -> User:
     return _make_user(
         db, "colleague@test.example", UserRole.EMPLOYEE, employee=colleague_under_responsable
     )
+
+
+def grant_balance(db, employee_id: int, leave_type_id: int, annee: int, jours=100) -> None:
+    """Test setup helper: directly funds a solde so tests whose focus is
+    NOT balance-sufficiency (RBAC, workflow, date-splitting, ...) don't have
+    to think about it — leave_service._check_solde_suffisant now runs on
+    every create_request() call for a deduit_du_solde=True type. Tests that
+    ARE about balance sufficiency fund a specific, deliberately small amount
+    instead of calling this."""
+    balance = get_or_create_balance(db, employee_id, leave_type_id, annee)
+    balance.jours_acquis = Decimal(jours)
+    db.flush()
 
 
 def login(client: TestClient, email: str, password: str = "TestPass123!") -> str:

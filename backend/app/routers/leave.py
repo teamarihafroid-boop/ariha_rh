@@ -16,7 +16,7 @@ from app.dependencies import (
     require_role,
     verify_csrf,
 )
-from app.models import Employee, Holiday, LeaveBalance, LeaveRequest, LeaveRequestStatus
+from app.models import Employee, Holiday, LeaveRequest, LeaveRequestStatus, LeaveType
 from app.models.enums import UserRole
 from app.schemas.leave import (
     LeaveBalanceOut,
@@ -295,12 +295,9 @@ def leave_certificate(
     feries_labels = ", ".join(f"{h.date.strftime('%d/%m/%Y')} ({h.libelle})" for h in feries)
 
     annee = request.date_debut.year
-    balance = (
-        db.query(LeaveBalance)
-        .filter_by(employee_id=employee.id, leave_type_id=request.leave_type_id, annee=annee)
-        .first()
+    jours_acquis = leave_service.jours_acquis_effectifs(
+        db, employee.id, request.leave_type_id, annee
     )
-    jours_acquis = balance.jours_acquis if balance else 0
     jours_pris_total = leave_service.jours_pris(db, employee.id, request.leave_type_id, annee)
     solde_apres = jours_acquis - jours_pris_total
     solde_avant = solde_apres + request.nb_jours
@@ -350,13 +347,11 @@ def list_leave_balances(
             )
         employees = [employee]
 
-    from app.models import LeaveType
-
     leave_types = db.query(LeaveType).all()
     results: list[LeaveBalanceOut] = []
     for emp in employees:
         for lt in leave_types:
-            balance = leave_service.get_or_create_balance(db, emp.id, lt.id, annee)
+            jours_acquis = leave_service.jours_acquis_effectifs(db, emp.id, lt.id, annee)
             pris = leave_service.jours_pris(db, emp.id, lt.id, annee)
             results.append(
                 LeaveBalanceOut(
@@ -364,9 +359,9 @@ def list_leave_balances(
                     leave_type_id=lt.id,
                     leave_type_libelle=lt.libelle,
                     annee=annee,
-                    jours_acquis=balance.jours_acquis,
+                    jours_acquis=jours_acquis,
                     jours_pris=pris,
-                    solde=balance.jours_acquis - pris,
+                    solde=jours_acquis - pris,
                 )
             )
     db.commit()
@@ -379,6 +374,21 @@ def upsert_leave_balance(
     current_user: AuthUser = Depends(require_role(UserRole.HR)),
     db: Session = Depends(get_db),
 ):
+    leave_type = db.get(LeaveType, payload.leave_type_id)
+    if leave_type is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Type de congé introuvable."
+        )
+    if leave_type.accrual_legal:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Le solde de ce type de congé est calculé automatiquement à partir de "
+                "l'ancienneté (date d'embauche). Corrigez la date d'embauche du collaborateur "
+                "si le solde affiché est incorrect, plutôt que de le modifier manuellement."
+            ),
+        )
+
     balance = leave_service.get_or_create_balance(
         db, payload.employee_id, payload.leave_type_id, payload.annee
     )
