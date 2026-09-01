@@ -362,6 +362,20 @@ def test_solde_check_skipped_for_non_deductible_leave_type(client, db, employee_
     assert resp.status_code == 201
 
 
+def test_cannot_submit_overlapping_request(client, db, employee_a_user, leave_type):
+    csrf = login(client, employee_a_user.email)
+    first = _create_request(
+        client, db, csrf, employee_a_user.employee_id, leave_type.id, "2026-09-07", "2026-09-11"
+    )
+    assert first.status_code == 201
+
+    resp = _create_request(
+        client, db, csrf, employee_a_user.employee_id, leave_type.id, "2026-09-09", "2026-09-15"
+    )
+    assert resp.status_code == 400
+    assert "Chevauchement" in resp.json()["detail"]
+
+
 def test_hr_cannot_manually_set_balance_for_accrual_legal_type(client, db, hr_user, employee_a):
     from app.models import LeaveType
 
@@ -458,3 +472,120 @@ def test_non_hr_cannot_set_leave_responsable(
         headers={"X-CSRF-Token": csrf},
     )
     assert resp.status_code == 403
+
+
+# --------------------------------------------------------- leave-types ----
+
+
+def test_hr_can_create_and_update_leave_type(client, hr_user):
+    csrf = login(client, hr_user.email)
+    resp = client.post(
+        "/api/leave-types",
+        json={
+            "libelle": "Congé sans solde (test)",
+            "couleur": "#111111",
+            "deduit_du_solde": False,
+            "accrual_legal": False,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 201
+    type_id = resp.json()["id"]
+    assert resp.json()["is_active"] is True
+
+    resp = client.put(
+        f"/api/leave-types/{type_id}",
+        json={
+            "libelle": "Congé sans solde (renommé)",
+            "couleur": "#222222",
+            "deduit_du_solde": False,
+            "accrual_legal": False,
+            "is_active": False,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["libelle"] == "Congé sans solde (renommé)"
+    assert resp.json()["is_active"] is False
+
+
+def test_non_hr_cannot_create_or_update_leave_type(client, dg_user, employee_a_user, leave_type):
+    for user in (dg_user, employee_a_user):
+        csrf = login(client, user.email)
+        resp = client.post(
+            "/api/leave-types",
+            json={
+                "libelle": "Type interdit",
+                "couleur": "#111111",
+                "deduit_du_solde": False,
+                "accrual_legal": False,
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert resp.status_code == 403
+
+        resp = client.put(
+            f"/api/leave-types/{leave_type.id}",
+            json={
+                "libelle": "Renommage interdit",
+                "couleur": "#222222",
+                "deduit_du_solde": True,
+                "accrual_legal": False,
+                "is_active": True,
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert resp.status_code == 403
+
+
+def test_duplicate_leave_type_libelle_rejected(client, hr_user, leave_type):
+    csrf = login(client, hr_user.email)
+    resp = client.post(
+        "/api/leave-types",
+        json={
+            "libelle": leave_type.libelle,
+            "couleur": "#333333",
+            "deduit_du_solde": True,
+            "accrual_legal": False,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 400
+
+
+def test_accrual_legal_requires_deduit_du_solde(client, hr_user):
+    csrf = login(client, hr_user.email)
+    resp = client.post(
+        "/api/leave-types",
+        json={
+            "libelle": "Type incohérent (test)",
+            "couleur": "#333333",
+            "deduit_du_solde": False,
+            "accrual_legal": True,
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 400
+
+
+def test_inactive_leave_type_hidden_by_default_visible_to_hr_with_flag(
+    client, db, hr_user, leave_type
+):
+    leave_type.is_active = False
+    db.flush()
+
+    login(client, hr_user.email)
+    resp = client.get("/api/leave-types")
+    assert leave_type.id not in {t["id"] for t in resp.json()}
+
+    resp = client.get("/api/leave-types?include_inactive=true")
+    assert leave_type.id in {t["id"] for t in resp.json()}
+
+
+def test_cannot_submit_request_for_inactive_leave_type(client, db, employee_a_user, leave_type):
+    leave_type.is_active = False
+    db.flush()
+    csrf = login(client, employee_a_user.email)
+    resp = _create_request(client, db, csrf, employee_a_user.employee_id, leave_type.id)
+    assert resp.status_code == 400
+    assert "n'est plus actif" in resp.json()["detail"]

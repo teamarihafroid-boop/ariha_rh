@@ -20,4 +20,8 @@ class LeaveType(Base):
     # manually entered by HR — used for "Congé payé" only. See that function's
     # docstring for the legal source and its limits.
     accrual_legal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Soft-delete: an inactive type is hidden from new-request pickers and
+    # can't be selected for a new leave_request, but existing leave_requests/
+    # leave_balances referencing it are left untouched (no FK to break).
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

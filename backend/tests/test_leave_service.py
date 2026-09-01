@@ -350,6 +350,144 @@ def test_jours_acquis_legaux_capped_at_thirty_for_high_seniority(db, employee_a)
     assert accrued == Decimal(30)
 
 
+# --------------------------------------------------------- overlap check --
+
+
+def test_create_request_rejects_overlap_with_pending_request(db, employee_a, leave_type, hr_user):
+    grant_balance(db, employee_a.id, leave_type.id, 2026)
+    leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 11),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    with pytest.raises(leave_service.LeaveServiceError, match="Chevauchement"):
+        leave_service.create_request(
+            db,
+            employee_id=employee_a.id,
+            leave_type_id=leave_type.id,
+            date_debut=date(2026, 9, 9),  # overlaps the middle of the first request
+            date_fin=date(2026, 9, 15),
+            commentaire=None,
+            submitted_by_user_id=hr_user.id,
+        )
+
+
+def test_create_request_rejects_overlap_across_different_leave_types(
+    db, employee_a, leave_type, hr_user
+):
+    from app.models import LeaveType
+
+    maladie = LeaveType(libelle="Maladie (overlap test)", couleur="#FB8C00", deduit_du_solde=False)
+    db.add(maladie)
+    db.flush()
+    grant_balance(db, employee_a.id, leave_type.id, 2026)
+    leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 11),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    # An employee can't be simultaneously on congé payé and maladie either.
+    with pytest.raises(leave_service.LeaveServiceError, match="Chevauchement"):
+        leave_service.create_request(
+            db,
+            employee_id=employee_a.id,
+            leave_type_id=maladie.id,
+            date_debut=date(2026, 9, 11),
+            date_fin=date(2026, 9, 12),
+            commentaire=None,
+            submitted_by_user_id=hr_user.id,
+        )
+
+
+def test_create_request_allows_adjacent_non_overlapping_dates(db, employee_a, leave_type, hr_user):
+    grant_balance(db, employee_a.id, leave_type.id, 2026)
+    leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 11),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    # Starts the day right after the first request ends — no overlap.
+    request = leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 12),
+        date_fin=date(2026, 9, 14),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    assert request.id is not None
+
+
+def test_create_request_ignores_rejected_and_cancelled_requests_for_overlap(
+    db, employee_a, leave_type, hr_user
+):
+    grant_balance(db, employee_a.id, leave_type.id, 2026)
+    rejected = leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 11),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    leave_service.reject_request(db, rejected, decided_by_user_id=hr_user.id, comment="Refusé")
+
+    cancelled = leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 11),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    leave_service.cancel_request(db, cancelled)
+
+    # Same dates as the rejected/cancelled requests above — must be allowed.
+    request = leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 11),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    assert request.id is not None
+
+
+# ---------------------------------------------------------- inactive type --
+
+
+def test_create_request_rejects_inactive_leave_type(db, employee_a, leave_type, hr_user):
+    leave_type.is_active = False
+    db.flush()
+    with pytest.raises(leave_service.LeaveServiceError, match="n'est plus actif"):
+        leave_service.create_request(
+            db,
+            employee_id=employee_a.id,
+            leave_type_id=leave_type.id,
+            date_debut=date(2026, 9, 7),
+            date_fin=date(2026, 9, 11),
+            commentaire=None,
+            submitted_by_user_id=hr_user.id,
+        )
+
+
 def test_accrual_legal_type_ignores_manual_balance(db, employee_a):
     from app.models import LeaveType
 

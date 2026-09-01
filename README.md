@@ -36,7 +36,7 @@ Seeded logins (password `ChangeMoi123!` for all):
 
 ```bash
 cd backend
-./.venv/Scripts/python -m pytest          # 65 tests: auth, RBAC, leave business logic, accrual, holidays
+./.venv/Scripts/python -m pytest          # 77 tests: auth, RBAC, leave business logic, accrual, holidays
 ./.venv/Scripts/python -m ruff check app tests
 ./.venv/Scripts/python -m black app tests
 ```
@@ -81,6 +81,14 @@ npm run format:check    # prettier --check
   al-Adha, 1 Muharram, Aïd al-Mawlid) shift every year with the lunar calendar and can't be computed —
   those still need manual entry via the same "Jours fériés" panel at `/hr/parametres`, once each year's
   dates are confirmed (same deliberate limitation as the prototype's original empty-seeded holidays).
+- **No overlapping leave requests**: a new request is rejected (400) if its dates overlap any of the
+  employee's existing pending/approved requests, regardless of leave type — an employee can't be
+  simultaneously "on" congé payé and maladie. Rejected/cancelled requests never conflict.
+- **Leave type management** (HR-39): HR can create, edit, and deactivate leave types at
+  `/hr/parametres` (`POST`/`PUT /leave-types`) instead of needing a developer to change the seed.
+  Deactivating a type (soft delete — `is_active`) hides it from new-request pickers without touching
+  existing leave_requests/leave_balances that reference it; a type can't be re-deleted outright since
+  those FKs would break. Accrual-legal types must also deduct from solde (enforced server-side).
 
 ## Known gaps / next steps
 

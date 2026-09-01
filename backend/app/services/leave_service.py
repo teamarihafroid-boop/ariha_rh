@@ -194,6 +194,29 @@ def _check_solde_suffisant(
             )
 
 
+def _check_no_overlap(db: Session, employee_id: int, date_debut: date, date_fin: date) -> None:
+    """Rejects a request whose dates overlap an existing pending or approved
+    request for the same employee, regardless of leave type — an employee
+    can't be on two leaves (e.g. congé payé and maladie) at once. Rejected/
+    cancelled requests never conflict."""
+    conflict = (
+        db.query(LeaveRequest)
+        .filter(
+            LeaveRequest.employee_id == employee_id,
+            LeaveRequest.status.in_([LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVED]),
+            LeaveRequest.date_debut <= date_fin,
+            LeaveRequest.date_fin >= date_debut,
+        )
+        .first()
+    )
+    if conflict is not None:
+        raise LeaveServiceError(
+            "Chevauchement avec une demande existante "
+            f"({conflict.date_debut.strftime('%d/%m/%Y')} - "
+            f"{conflict.date_fin.strftime('%d/%m/%Y')}, statut : {conflict.status.value})."
+        )
+
+
 def create_request(
     db: Session,
     *,
@@ -211,10 +234,14 @@ def create_request(
     leave_type = db.get(LeaveType, leave_type_id)
     if leave_type is None:
         raise LeaveServiceError("Type de congé introuvable.")
+    if not leave_type.is_active:
+        raise LeaveServiceError("Ce type de congé n'est plus actif.")
 
     nb_jours = jours_ouvres(db, date_debut, date_fin)
     if nb_jours <= 0:
         raise LeaveServiceError("La période sélectionnée ne contient aucun jour ouvré.")
+
+    _check_no_overlap(db, employee_id, date_debut, date_fin)
 
     if leave_type.deduit_du_solde:
         _check_solde_suffisant(db, employee_id, leave_type, date_debut, date_fin)

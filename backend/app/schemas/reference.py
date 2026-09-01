@@ -11,8 +11,24 @@ class LeaveTypeOut(BaseModel):
     couleur: str
     deduit_du_solde: bool
     accrual_legal: bool
+    is_active: bool
 
     model_config = {"from_attributes": True}
+
+
+class LeaveTypeCreate(BaseModel):
+    libelle: str
+    couleur: str = "#0288D1"
+    deduit_du_solde: bool = True
+    accrual_legal: bool = False
+
+
+class LeaveTypeUpdate(BaseModel):
+    libelle: str
+    couleur: str
+    deduit_du_solde: bool
+    accrual_legal: bool
+    is_active: bool
 
 
 class HolidayIn(BaseModel):

@@ -73,6 +73,7 @@ export interface LeaveType {
   couleur: string
   deduit_du_solde: boolean
   accrual_legal: boolean
+  is_active: boolean
 }
 
 export interface Holiday {
