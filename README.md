@@ -36,7 +36,7 @@ Seeded logins (password `ChangeMoi123!` for all):
 
 ```bash
 cd backend
-./.venv/Scripts/python -m pytest          # 77 tests: auth, RBAC, leave business logic, accrual, holidays
+./.venv/Scripts/python -m pytest          # 77 tests: auth, RBAC, leave business logic, accrual, holidays, PDF
 ./.venv/Scripts/python -m ruff check app tests
 ./.venv/Scripts/python -m black app tests
 ```
@@ -62,7 +62,8 @@ npm run format:check    # prettier --check
   via `jours_ouvres()` (Mon-Sat worked, Sun + holidays excluded — matches the prototype's real business rule).
 - Leave-responsable capability (HR-40): per-department flag + submit-on-behalf, configurable at
   `/hr/parametres`; still requires HR approval regardless of who submitted (RESP-03).
-- Notifications on approve/reject (EMP-05), printable HTML certificate gated on approval (EMP-06/HR-19).
+- Notifications on approve/reject (EMP-05), formal downloadable PDF certificate gated on approval
+  (EMP-06/HR-19) — server-rendered via xhtml2pdf, letterhead + signature blocks.
 - Real audit trail (`audit_logs.actor_user_id`, NOT NULL) replacing the prototype's host-PC-account bug.
 - **Solde-sufficiency check**: a request is rejected (400) if it would exceed the employee's current
   balance for that leave type, checked per calendar year for a year-spanning request.
