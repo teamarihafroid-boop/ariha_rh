@@ -89,3 +89,20 @@ export function IconFlag(props: SVGProps<SVGSVGElement>) {
     </Icon>
   )
 }
+
+export function IconBell(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 4.5 1.5 6 2 7H4c.5-1 2-2.5 2-7" />
+      <path d="M10.5 20a1.5 1.5 0 0 0 3 0" />
+    </Icon>
+  )
+}
+
+export function IconCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M20 6L9 17l-5-5" />
+    </Icon>
+  )
+}

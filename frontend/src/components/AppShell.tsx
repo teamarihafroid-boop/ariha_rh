@@ -2,6 +2,7 @@ import { useState, type ComponentType, type ReactNode, type SVGProps } from 'rea
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth-context'
 import type { Role } from '../lib/api'
+import { NotificationBell } from './NotificationBell'
 import {
   IconCalendar,
   IconClipboard,
@@ -61,15 +62,16 @@ function BrandMark() {
   )
 }
 
-function NavContent({ onNavigate }: { onNavigate?: () => void }) {
+function NavContent({ onNavigate, bell = false }: { onNavigate?: () => void; bell?: boolean }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const sections = user ? NAV_BY_ROLE[user.role] : []
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-5 py-5">
+      <div className="flex items-center justify-between px-5 py-5">
         <BrandMark />
+        {bell && <NotificationBell />}
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4">
@@ -136,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Desktop sidebar */}
       <aside className="hidden w-64 flex-none border-r border-slate-200 bg-white lg:block">
         <div className="fixed h-screen w-64">
-          <NavContent />
+          <NavContent bell />
         </div>
       </aside>
 
@@ -159,15 +161,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Ouvrir le menu"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
-          >
-            <IconMenu className="h-5 w-5" />
-          </button>
-          <BrandMark />
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Ouvrir le menu"
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+            >
+              <IconMenu className="h-5 w-5" />
+            </button>
+            <BrandMark />
+          </div>
+          <NotificationBell />
         </header>
 
         <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
