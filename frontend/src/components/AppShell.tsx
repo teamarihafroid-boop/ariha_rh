@@ -71,7 +71,7 @@ function NavContent({ onNavigate, bell = false }: { onNavigate?: () => void; bel
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-5 py-5">
         <BrandMark />
-        {bell && <NotificationBell />}
+        {bell && <NotificationBell align="left" />}
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4">

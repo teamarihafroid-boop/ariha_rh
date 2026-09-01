@@ -19,7 +19,7 @@ function formatRelative(iso: string): string {
   return `il y a ${Math.floor(hours / 24)} j`
 }
 
-export function NotificationBell() {
+export function NotificationBell({ align = 'right' }: { align?: 'left' | 'right' }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -87,7 +87,11 @@ export function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div
+            className={`absolute z-50 mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white shadow-lg ${
+              align === 'right' ? 'right-0' : 'left-0'
+            }`}
+          >
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <span className="text-sm font-semibold text-slate-800">Notifications</span>
               {unreadCount > 0 && (
