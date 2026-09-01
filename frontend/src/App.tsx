@@ -8,6 +8,8 @@ import { LeaveCalendar } from './routes/hr/LeaveCalendar'
 import { ResponsablesPage } from './routes/hr/ResponsablesPage'
 import { LeaveTypesPage } from './routes/hr/LeaveTypesPage'
 import { HolidaysPage } from './routes/hr/HolidaysPage'
+import { PresencePage } from './routes/hr/PresencePage'
+import { AttendanceCodesPage } from './routes/hr/AttendanceCodesPage'
 import { MyLeave } from './routes/employee/MyLeave'
 import { LeaveOverview } from './routes/dg/LeaveOverview'
 
@@ -44,6 +46,8 @@ export default function App() {
         <Route path="parametres/responsables" element={<ResponsablesPage />} />
         <Route path="parametres/types-conge" element={<LeaveTypesPage />} />
         <Route path="parametres/feries" element={<HolidaysPage />} />
+        <Route path="parametres/codes-presence" element={<AttendanceCodesPage />} />
+        <Route path="presence" element={<PresencePage />} />
       </Route>
 
       <Route

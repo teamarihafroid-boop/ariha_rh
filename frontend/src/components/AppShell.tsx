@@ -11,6 +11,7 @@ import {
   IconLogout,
   IconMenu,
   IconTag,
+  IconUpload,
   IconUsers,
 } from './icons'
 
@@ -41,11 +42,16 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       ],
     },
     {
+      title: 'Présence',
+      items: [{ to: '/hr/presence', label: 'Présence', icon: IconUpload }],
+    },
+    {
       title: 'Paramètres',
       items: [
         { to: '/hr/parametres/responsables', label: 'Responsables congés', icon: IconUsers },
         { to: '/hr/parametres/types-conge', label: 'Types de congé', icon: IconTag },
         { to: '/hr/parametres/feries', label: 'Jours fériés', icon: IconFlag },
+        { to: '/hr/parametres/codes-presence', label: 'Codes de présence', icon: IconTag },
       ],
     },
   ],

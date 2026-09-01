@@ -57,12 +57,38 @@ async function request<T>(
   return undefined as T
 }
 
+async function upload<T>(path: string, formData: FormData): Promise<T> {
+  const headers: Record<string, string> = {}
+  const csrf = getCookie('csrf_token')
+  if (csrf) headers['X-CSRF-Token'] = csrf
+
+  const resp = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: formData,
+  })
+
+  if (!resp.ok) {
+    let detail = resp.statusText
+    try {
+      const data = await resp.json()
+      detail = data.detail ?? detail
+    } catch {
+      // response had no JSON body
+    }
+    throw new ApiError(resp.status, detail)
+  }
+  return resp.json() as Promise<T>
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload,
 }
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
@@ -74,6 +100,7 @@ export interface LeaveType {
   deduit_du_solde: boolean
   accrual_legal: boolean
   is_active: boolean
+  code_court: string | null
 }
 
 export interface Holiday {
@@ -132,4 +159,32 @@ export interface NotificationItem {
   related_entity_id: number
   is_read: boolean
   created_at: string
+}
+
+export interface AttendanceCode {
+  id: number
+  libelle: string
+  code_court: string
+  couleur: string
+  compte_absence: boolean
+  is_active: boolean
+}
+
+export interface UploadPreview {
+  token: string
+  columns: string[]
+  sample_rows: Record<string, string>[]
+  guessed_identifier_column: string | null
+  guessed_day_columns: string[]
+  nb_rows: number
+}
+
+export interface ImportResult {
+  id: number
+  nom_fichier: string
+  mois: number
+  annee: number
+  nb_lignes_importees: number
+  nb_lignes_non_reconnues: number
+  noms_non_reconnus: string[]
 }

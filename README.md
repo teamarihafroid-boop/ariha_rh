@@ -36,7 +36,7 @@ Seeded logins (password `ChangeMoi123!` for all):
 
 ```bash
 cd backend
-./.venv/Scripts/python -m pytest          # 77 tests: auth, RBAC, leave business logic, accrual, holidays, PDF
+./.venv/Scripts/python -m pytest          # 96 tests: auth, RBAC, leave business logic, accrual, holidays, PDF, attendance
 ./.venv/Scripts/python -m ruff check app tests
 ./.venv/Scripts/python -m black app tests
 ```
@@ -90,6 +90,16 @@ npm run format:check    # prettier --check
   Deactivating a type (soft delete — `is_active`) hides it from new-request pickers without touching
   existing leave_requests/leave_balances that reference it; a type can't be re-deleted outright since
   those FKs would break. Accrual-legal types must also deduct from solde (enforced server-side).
+- **Timesheet import + monthly attendance export** (HR-16/HR-20, `/hr/presence`): upload a pointeuse
+  export (.xlsx/.csv), map the identifier column (name or matricule) and day columns from a preview,
+  confirm to upsert `AttendanceEntry` rows — unmatched names are reported (not auto-fixed; correct the
+  source file or the employee record and re-import, no partial reconciliation UI, matching the
+  prototype). `GET /attendance/export` produces a real `.xlsx` (openpyxl) with a per-employee/per-day
+  grid (pointage code, or the congé's `code_court` if approved leave overlaps that day — flagged as a
+  conflict when both exist) plus a "Légende" sheet. Attendance codes (`P`, `A`, ...) are HR-managed at
+  `/hr/parametres/codes-presence`, mirroring how leave types work. **Deliberately does not include
+  variable pay (avances/primes/commissions) or disciplinary suspensions** in the export, unlike the
+  prototype's version — those modules don't exist yet in this rebuild.
 
 ## Known gaps / next steps
 

@@ -12,6 +12,7 @@ class LeaveTypeOut(BaseModel):
     deduit_du_solde: bool
     accrual_legal: bool
     is_active: bool
+    code_court: str | None
 
     model_config = {"from_attributes": True}
 
@@ -21,6 +22,7 @@ class LeaveTypeCreate(BaseModel):
     couleur: str = "#0288D1"
     deduit_du_solde: bool = True
     accrual_legal: bool = False
+    code_court: str | None = None
 
 
 class LeaveTypeUpdate(BaseModel):
@@ -29,6 +31,7 @@ class LeaveTypeUpdate(BaseModel):
     deduit_du_solde: bool
     accrual_legal: bool
     is_active: bool
+    code_court: str | None = None
 
 
 class HolidayIn(BaseModel):

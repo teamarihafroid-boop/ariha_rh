@@ -53,6 +53,7 @@ def create_leave_type(
         couleur=payload.couleur,
         deduit_du_solde=payload.deduit_du_solde,
         accrual_legal=payload.accrual_legal,
+        code_court=payload.code_court,
     )
     db.add(leave_type)
     try:
@@ -97,6 +98,7 @@ def update_leave_type(
     leave_type.deduit_du_solde = payload.deduit_du_solde
     leave_type.accrual_legal = payload.accrual_legal
     leave_type.is_active = payload.is_active
+    leave_type.code_court = payload.code_court
     try:
         db.flush()
     except IntegrityError as exc:

@@ -4,7 +4,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, departments, employees, holidays, leave, leave_types, notifications
+from app.routers import (
+    attendance,
+    auth,
+    departments,
+    employees,
+    holidays,
+    leave,
+    leave_types,
+    notifications,
+)
 
 settings = get_settings()
 
@@ -18,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(attendance.router)
 app.include_router(auth.router)
 app.include_router(departments.router)
 app.include_router(employees.router)

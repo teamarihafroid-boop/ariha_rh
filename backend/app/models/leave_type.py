@@ -24,4 +24,7 @@ class LeaveType(Base):
     # can't be selected for a new leave_request, but existing leave_requests/
     # leave_balances referencing it are left untouched (no FK to break).
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Short display code for the monthly attendance export grid (e.g. "CP" for
+    # Congé payé) — a day cell is too narrow for the full libelle.
+    code_court: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

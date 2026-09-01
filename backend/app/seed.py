@@ -9,20 +9,37 @@ from datetime import UTC, date, datetime
 
 from app.core.security import hash_password
 from app.database import SessionLocal
-from app.models import Department, Employee, EmployeeStatus, LeaveType, Position, User
+from app.models import (
+    AttendanceCode,
+    Department,
+    Employee,
+    EmployeeStatus,
+    LeaveType,
+    Position,
+    User,
+)
 from app.models.enums import UserRole
 from app.services import holiday_service
 
-# (libelle, couleur, deduit_du_solde, accrual_legal)
+# (libelle, couleur, deduit_du_solde, accrual_legal, code_court)
 # accrual_legal=True only for "Congé payé": its jours_acquis is computed
 # automatically from tenure (leave_service.jours_acquis_legaux) rather than
 # entered manually — see that function's docstring for the legal basis.
+# code_court is the short label shown on the monthly attendance export grid.
 SEED_LEAVE_TYPES = [
-    ("Congé payé", "#0288D1", True, True),
-    ("Récupération", "#43A047", True, False),
-    ("Maladie", "#FB8C00", False, False),
-    ("Sans solde", "#8E24AA", False, False),
-    ("Exceptionnel (mariage/naissance/décès)", "#546E7A", False, False),
+    ("Congé payé", "#0288D1", True, True, "CP"),
+    ("Récupération", "#43A047", True, False, "REC"),
+    ("Maladie", "#FB8C00", False, False, "MAL"),
+    ("Sans solde", "#8E24AA", False, False, "SS"),
+    ("Exceptionnel (mariage/naissance/décès)", "#546E7A", False, False, "EXC"),
+]
+
+# (libelle, code_court, couleur, compte_absence)
+SEED_ATTENDANCE_CODES = [
+    ("Présent", "P", "#43A047", False),
+    ("Absence non justifiée", "A", "#E53935", True),
+    ("Retard", "R", "#FB8C00", False),
+    ("Mission", "M", "#1E88E5", False),
 ]
 
 
@@ -43,19 +60,38 @@ def run() -> None:
             db.flush()
 
         if db.query(LeaveType).count() == 0:
-            for libelle, couleur, deduit, accrual_legal in SEED_LEAVE_TYPES:
+            for libelle, couleur, deduit, accrual_legal, code_court in SEED_LEAVE_TYPES:
                 db.add(
                     LeaveType(
                         libelle=libelle,
                         couleur=couleur,
                         deduit_du_solde=deduit,
                         accrual_legal=accrual_legal,
+                        code_court=code_court,
                     )
                 )
             db.flush()
         else:
-            # Backfill for a DB seeded before accrual_legal existed.
-            db.query(LeaveType).filter_by(libelle="Congé payé").update({"accrual_legal": True})
+            # Backfill for a DB seeded before accrual_legal/code_court existed.
+            db.query(LeaveType).filter_by(libelle="Congé payé").update(
+                {"accrual_legal": True, "code_court": "CP"}
+            )
+            for libelle, _couleur, _deduit, _accrual, code_court in SEED_LEAVE_TYPES:
+                db.query(LeaveType).filter_by(libelle=libelle, code_court=None).update(
+                    {"code_court": code_court}
+                )
+            db.flush()
+
+        if db.query(AttendanceCode).count() == 0:
+            for libelle, code_court, couleur, compte_absence in SEED_ATTENDANCE_CODES:
+                db.add(
+                    AttendanceCode(
+                        libelle=libelle,
+                        code_court=code_court,
+                        couleur=couleur,
+                        compte_absence=compte_absence,
+                    )
+                )
             db.flush()
 
         active_status = db.query(EmployeeStatus).filter_by(libelle="Actif").first()

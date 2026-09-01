@@ -1,33 +1,33 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, type LeaveType } from '../../lib/api'
+import { api, ApiError, type AttendanceCode } from '../../lib/api'
 import { Button, Card, ErrorBanner, Field, Input, PageHeader, Table } from '../../components/ui'
 
-interface LeaveTypeForm {
+interface CodeForm {
   libelle: string
-  couleur: string
-  deduit_du_solde: boolean
-  accrual_legal: boolean
-  is_active?: boolean
   code_court: string
+  couleur: string
+  compte_absence: boolean
+  is_active?: boolean
 }
 
-export function LeaveTypesPage() {
-  const [types, setTypes] = useState<LeaveType[]>([])
+const EMPTY_FORM: CodeForm = {
+  libelle: '',
+  code_court: '',
+  couleur: '#607D8B',
+  compte_absence: false,
+}
+
+export function AttendanceCodesPage() {
+  const [codes, setCodes] = useState<AttendanceCode[]>([])
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState<LeaveTypeForm | null>(null)
-  const [newForm, setNewForm] = useState<LeaveTypeForm>({
-    libelle: '',
-    couleur: '#0288D1',
-    deduit_du_solde: true,
-    accrual_legal: false,
-    code_court: '',
-  })
+  const [editForm, setEditForm] = useState<CodeForm | null>(null)
+  const [newForm, setNewForm] = useState<CodeForm>(EMPTY_FORM)
 
   const load = async () => {
     try {
-      const all = await api.get<LeaveType[]>('/leave-types?include_inactive=true')
-      setTypes(all)
+      const all = await api.get<AttendanceCode[]>('/attendance/codes?include_inactive=true')
+      setCodes(all)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur de chargement.')
     }
@@ -39,32 +39,25 @@ export function LeaveTypesPage() {
 
   const create = async (e: FormEvent) => {
     e.preventDefault()
-    if (!newForm.libelle.trim()) return
+    if (!newForm.libelle.trim() || !newForm.code_court.trim()) return
     setError(null)
     try {
-      await api.post('/leave-types', newForm)
-      setNewForm({
-        libelle: '',
-        couleur: '#0288D1',
-        deduit_du_solde: true,
-        accrual_legal: false,
-        code_court: '',
-      })
+      await api.post('/attendance/codes', newForm)
+      setNewForm(EMPTY_FORM)
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur.')
     }
   }
 
-  const startEdit = (t: LeaveType) => {
-    setEditingId(t.id)
+  const startEdit = (c: AttendanceCode) => {
+    setEditingId(c.id)
     setEditForm({
-      libelle: t.libelle,
-      couleur: t.couleur,
-      deduit_du_solde: t.deduit_du_solde,
-      accrual_legal: t.accrual_legal,
-      is_active: t.is_active,
-      code_court: t.code_court ?? '',
+      libelle: c.libelle,
+      code_court: c.code_court,
+      couleur: c.couleur,
+      compte_absence: c.compte_absence,
+      is_active: c.is_active,
     })
   }
 
@@ -72,7 +65,7 @@ export function LeaveTypesPage() {
     if (!editForm) return
     setError(null)
     try {
-      await api.put(`/leave-types/${id}`, editForm)
+      await api.put(`/attendance/codes/${id}`, editForm)
       setEditingId(null)
       setEditForm(null)
       await load()
@@ -81,10 +74,10 @@ export function LeaveTypesPage() {
     }
   }
 
-  const toggleActive = async (t: LeaveType) => {
+  const toggleActive = async (c: AttendanceCode) => {
     setError(null)
     try {
-      await api.put(`/leave-types/${t.id}`, { ...t, is_active: !t.is_active })
+      await api.put(`/attendance/codes/${c.id}`, { ...c, is_active: !c.is_active })
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur.')
@@ -94,13 +87,13 @@ export function LeaveTypesPage() {
   return (
     <div>
       <PageHeader
-        title="Types de congé"
-        subtitle="Créez ou modifiez les types de congé disponibles. Désactiver un type le retire des nouvelles demandes sans toucher à l'historique existant."
+        title="Codes de présence"
+        subtitle="Les codes utilisés pour interpréter les cellules d'un pointage importé (ex. P = présent, A = absence) et affichés sur l'export Excel mensuel."
       />
       <ErrorBanner message={error} />
 
       <Card className="mb-4 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Ajouter un type de congé</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">Ajouter un code</h3>
         <form onSubmit={create} className="flex flex-wrap items-end gap-3">
           <Field label="Libellé" className="min-w-[10rem] flex-1">
             <Input
@@ -112,8 +105,9 @@ export function LeaveTypesPage() {
           </Field>
           <Field label="Code court">
             <Input
+              required
               className="w-20 py-1.5"
-              placeholder="ex. CP"
+              placeholder="ex. P"
               maxLength={8}
               value={newForm.code_court}
               onChange={(e) => setNewForm({ ...newForm, code_court: e.target.value.toUpperCase() })}
@@ -131,19 +125,10 @@ export function LeaveTypesPage() {
             <input
               type="checkbox"
               className="accent-brand-700"
-              checked={newForm.deduit_du_solde}
-              onChange={(e) => setNewForm({ ...newForm, deduit_du_solde: e.target.checked })}
+              checked={newForm.compte_absence}
+              onChange={(e) => setNewForm({ ...newForm, compte_absence: e.target.checked })}
             />
-            Déduit du solde
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="accent-brand-700"
-              checked={newForm.accrual_legal}
-              onChange={(e) => setNewForm({ ...newForm, accrual_legal: e.target.checked })}
-            />
-            Accrual automatique (ancienneté)
+            Compte comme absence
           </label>
           <Button type="submit">Ajouter</Button>
         </form>
@@ -156,16 +141,15 @@ export function LeaveTypesPage() {
               <th className="px-4 py-2">Libellé</th>
               <th className="px-4 py-2">Code</th>
               <th className="px-4 py-2">Couleur</th>
-              <th className="px-4 py-2">Déduit du solde</th>
-              <th className="px-4 py-2">Accrual auto</th>
+              <th className="px-4 py-2">Absence</th>
               <th className="px-4 py-2">Statut</th>
               <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody>
-            {types.map((t) =>
-              editingId === t.id && editForm ? (
-                <tr key={t.id} className="border-b border-slate-100 last:border-0">
+            {codes.map((c) =>
+              editingId === c.id && editForm ? (
+                <tr key={c.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-3">
                     <Input
                       className="py-1"
@@ -195,19 +179,9 @@ export function LeaveTypesPage() {
                     <input
                       type="checkbox"
                       className="accent-brand-700"
-                      checked={editForm.deduit_du_solde}
+                      checked={editForm.compte_absence}
                       onChange={(e) =>
-                        setEditForm({ ...editForm, deduit_du_solde: e.target.checked })
-                      }
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      className="accent-brand-700"
-                      checked={editForm.accrual_legal}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, accrual_legal: e.target.checked })
+                        setEditForm({ ...editForm, compte_absence: e.target.checked })
                       }
                     />
                   </td>
@@ -217,7 +191,7 @@ export function LeaveTypesPage() {
                   <td className="px-4 py-3 text-right">
                     <button
                       className="mr-3 text-sm font-medium text-brand-700 hover:underline"
-                      onClick={() => saveEdit(t.id)}
+                      onClick={() => saveEdit(c.id)}
                     >
                       Enregistrer
                     </button>
@@ -233,42 +207,39 @@ export function LeaveTypesPage() {
                   </td>
                 </tr>
               ) : (
-                <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-slate-800">{t.libelle}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                    {t.code_court || '—'}
-                  </td>
+                <tr key={c.id} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-3 font-medium text-slate-800">{c.libelle}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.code_court}</td>
                   <td className="px-4 py-3">
                     <span
                       className="inline-block h-4 w-4 rounded-full border border-slate-300"
-                      style={{ backgroundColor: t.couleur }}
+                      style={{ backgroundColor: c.couleur }}
                     />
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{t.deduit_du_solde ? 'Oui' : 'Non'}</td>
-                  <td className="px-4 py-3 text-slate-600">{t.accrual_legal ? 'Oui' : 'Non'}</td>
+                  <td className="px-4 py-3 text-slate-600">{c.compte_absence ? 'Oui' : 'Non'}</td>
                   <td className="px-4 py-3">
                     <span
                       className={
-                        t.is_active
+                        c.is_active
                           ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700'
                           : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500'
                       }
                     >
-                      {t.is_active ? 'Actif' : 'Inactif'}
+                      {c.is_active ? 'Actif' : 'Inactif'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       className="mr-3 text-sm font-medium text-brand-700 hover:underline"
-                      onClick={() => startEdit(t)}
+                      onClick={() => startEdit(c)}
                     >
                       Modifier
                     </button>
                     <button
                       className="text-sm text-red-600 hover:underline"
-                      onClick={() => toggleActive(t)}
+                      onClick={() => toggleActive(c)}
                     >
-                      {t.is_active ? 'Désactiver' : 'Réactiver'}
+                      {c.is_active ? 'Désactiver' : 'Réactiver'}
                     </button>
                   </td>
                 </tr>
