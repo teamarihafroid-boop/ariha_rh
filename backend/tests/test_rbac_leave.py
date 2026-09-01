@@ -278,6 +278,9 @@ def test_certificate_forbidden_before_approval_ok_after_for_owner(
     login(client, employee_a_user.email)
     resp = client.get(f"/api/leave-requests/{request_id}/certificate")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert "attachment" in resp.headers["content-disposition"]
+    assert resp.content.startswith(b"%PDF")
 
 
 def test_notification_created_only_for_leave_owner_on_approve(

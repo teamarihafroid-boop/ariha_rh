@@ -4,40 +4,90 @@
 <meta charset="utf-8">
 <title>Attestation de congé — {{ employee.full_name }}</title>
 <style>
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #1a1a1a; margin: 40px; }
-  h1 { font-size: 18px; text-transform: uppercase; text-align: center; margin-bottom: 4px; }
-  .numero { text-align: center; color: #555; margin-bottom: 32px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  td, th { padding: 6px 8px; border: 1px solid #ccc; text-align: left; }
-  th { background: #f4f4f4; width: 40%; }
-  .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
-  .signatures div { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 8px; }
-  @media print { body { margin: 0; } }
+  @page { size: A4; margin: 1.8cm 2cm 1.6cm 2cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #14202E; }
+
+  table.letterhead { width: 100%; border-bottom: 2px solid #17519F; padding-bottom: 6px; margin-bottom: 16px; }
+  table.letterhead td { vertical-align: middle; }
+  .brand-name { font-size: 13pt; font-weight: bold; color: #17519F; }
+  .brand-sub { font-size: 7.5pt; color: #4B5A6B; }
+  .doc-meta { text-align: right; font-size: 7.5pt; color: #4B5A6B; line-height: 1.4; }
+
+  h1 { text-align: center; font-size: 15pt; letter-spacing: 1px; text-transform: uppercase; color: #14202E; margin: 0 0 3px; }
+  .numero { text-align: center; font-size: 8.5pt; color: #4B5A6B; margin: 0 0 14px; }
+
+  .section-title { font-size: 8.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: .5px;
+    color: #E85624; border-bottom: 1.5px solid #E85624; padding-bottom: 2px; margin: 14px 0 4px; }
+
+  table.info { width: 100%; border-collapse: collapse; }
+  table.info td { padding: 4px 2px; border-bottom: 1px dotted #B4C0CB; font-size: 9.5pt; }
+  table.info td.label { color: #4B5A6B; width: 48%; }
+  table.info td.value { font-weight: bold; color: #14202E; text-align: right; }
+
+  table.signatures { width: 100%; margin-top: 26px; border-collapse: collapse; }
+  table.signatures td { width: 33%; text-align: center; font-size: 8.5pt; color: #4B5A6B; vertical-align: top; padding: 0 10px; }
+  .sig-box { border-bottom: 1px solid #14202E; height: 40px; margin-top: 8px; }
+
+  .footer { margin-top: 22px; font-size: 7.5pt; color: #9AA5B1; text-align: center;
+    border-top: 1px solid #E2E8EF; padding-top: 6px; }
 </style>
 </head>
 <body>
+
+  <table class="letterhead">
+    <tr>
+      <td style="width:50px;"><img src="{{ logo_data_uri }}" width="40" height="40"/></td>
+      <td>
+        <div class="brand-name">ARIHA FROID</div>
+        <div class="brand-sub">Cockpit RH — ARIHA AI</div>
+      </td>
+      <td class="doc-meta">
+        Document généré le {{ generated_at }}<br/>
+        Référence : {{ numero }}
+      </td>
+    </tr>
+  </table>
+
   <h1>Attestation de congé</h1>
   <p class="numero">N° {{ numero }}</p>
 
-  <table>
-    <tr><th>Collaborateur</th><td>{{ employee.full_name }}</td></tr>
-    <tr><th>Matricule</th><td>{{ employee.matricule or "—" }}</td></tr>
-    <tr><th>Département</th><td>{{ employee.department.nom if employee.department else "—" }}</td></tr>
-    <tr><th>Type de congé</th><td>{{ entry.leave_type.libelle }}</td></tr>
-    <tr><th>Période</th><td>Du {{ entry.date_debut.strftime("%d/%m/%Y") }} au {{ entry.date_fin.strftime("%d/%m/%Y") }}</td></tr>
-    <tr><th>Nombre de jours</th><td>{{ entry.nb_jours }}</td></tr>
-    <tr><th>Date de reprise</th><td>{{ date_retour.strftime("%d/%m/%Y") }}</td></tr>
-    <tr><th>Jours de repos hebdomadaire inclus</th><td>{{ repos_labels or "—" }}</td></tr>
-    <tr><th>Jours fériés inclus</th><td>{{ feries_labels or "—" }}</td></tr>
-    <tr><th>Solde avant la demande</th><td>{{ solde_avant }} jour(s)</td></tr>
-    <tr><th>Solde après la demande</th><td>{{ solde_apres }} jour(s)</td></tr>
-    <tr><th>Approuvé par</th><td>{{ entry.decided_by.email if entry.decided_by else "—" }}</td></tr>
-    <tr><th>Approuvé le</th><td>{{ entry.decided_at.strftime("%d/%m/%Y") if entry.decided_at else "—" }}</td></tr>
+  <div class="section-title">Collaborateur</div>
+  <table class="info">
+    <tr><td class="label">Nom &amp; prénom</td><td class="value">{{ employee.full_name }}</td></tr>
+    <tr><td class="label">Matricule</td><td class="value">{{ employee.matricule or "—" }}</td></tr>
+    <tr><td class="label">Fonction</td><td class="value">{{ employee.position.intitule if employee.position else "—" }}</td></tr>
+    <tr><td class="label">Département</td><td class="value">{{ employee.department.nom if employee.department else "—" }}</td></tr>
   </table>
 
-  <div class="signatures">
-    <div>Signature du collaborateur</div>
-    <div>Signature RH</div>
+  <div class="section-title">Détails du congé</div>
+  <table class="info">
+    <tr><td class="label">Type de congé</td><td class="value">{{ entry.leave_type.libelle }}</td></tr>
+    <tr><td class="label">Date de départ (1er jour de congé)</td><td class="value">{{ entry.date_debut.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><td class="label">Date de reprise</td><td class="value">{{ date_retour.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><td class="label">Nombre de jours</td><td class="value">{{ entry.nb_jours }} jour(s)</td></tr>
+    <tr><td class="label">Jour(s) de repos hebdomadaire inclus</td><td class="value">{{ repos_labels or "—" }}</td></tr>
+    <tr><td class="label">Jour(s) férié(s) inclus</td><td class="value">{{ feries_labels or "—" }}</td></tr>
+  </table>
+
+  <div class="section-title">Situation des congés (réservé à la DRH)</div>
+  <table class="info">
+    <tr><td class="label">Solde disponible avant cette demande</td><td class="value">{{ solde_avant }} j</td></tr>
+    <tr><td class="label">Nouveau solde après cette demande</td><td class="value">{{ solde_apres }} j</td></tr>
+    <tr><td class="label">Approuvé par</td><td class="value">{{ entry.decided_by.email if entry.decided_by else "—" }}</td></tr>
+    <tr><td class="label">Approuvé le</td><td class="value">{{ entry.decided_at.strftime("%d/%m/%Y") if entry.decided_at else "—" }}</td></tr>
+  </table>
+
+  <table class="signatures">
+    <tr>
+      <td>Signature de l'intéressé(e)<div class="sig-box"></div></td>
+      <td>Visa RH<div class="sig-box"></div></td>
+      <td>Signature Directeur Général<div class="sig-box"></div></td>
+    </tr>
+  </table>
+
+  <div class="footer">
+    Document généré automatiquement par ARIHA AI — à signer et archiver au dossier du collaborateur.
   </div>
+
 </body>
 </html>

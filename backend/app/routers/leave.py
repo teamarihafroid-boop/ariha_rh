@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import base64
 import calendar as cal
-from datetime import date, timedelta
+import io
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
+from xhtml2pdf import pisa
 
 from app.database import get_db
 from app.dependencies import (
@@ -33,6 +36,9 @@ router = APIRouter(prefix="/api", tags=["leave"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+_LOGO_PATH = Path(__file__).resolve().parent.parent / "static" / "logo.png"
+_LOGO_DATA_URI = "data:image/png;base64," + base64.b64encode(_LOGO_PATH.read_bytes()).decode()
 
 
 def _serialize(r: LeaveRequest) -> LeaveRequestOut:
@@ -266,7 +272,6 @@ def cancel_leave_request(
 @router.get("/leave-requests/{request_id}/certificate")
 def leave_certificate(
     request_id: int,
-    http_request: Request,
     current_user: AuthUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -301,20 +306,33 @@ def leave_certificate(
     jours_pris_total = leave_service.jours_pris(db, employee.id, request.leave_type_id, annee)
     solde_apres = jours_acquis - jours_pris_total
     solde_avant = solde_apres + request.nb_jours
+    numero = f"{annee % 100:02d}{request.id:03d}"
 
-    return templates.TemplateResponse(
-        http_request,
-        "leave_certificate.html",
-        {
-            "entry": request,
-            "employee": employee,
-            "numero": f"{annee % 100:02d}{request.id:03d}",
-            "date_retour": request.date_fin + timedelta(days=1),
-            "repos_labels": repos_labels,
-            "feries_labels": feries_labels,
-            "solde_avant": solde_avant,
-            "solde_apres": solde_apres,
-        },
+    html = templates.env.get_template("leave_certificate.html").render(
+        entry=request,
+        employee=employee,
+        numero=numero,
+        date_retour=request.date_fin + timedelta(days=1),
+        repos_labels=repos_labels,
+        feries_labels=feries_labels,
+        solde_avant=solde_avant,
+        solde_apres=solde_apres,
+        logo_data_uri=_LOGO_DATA_URI,
+        generated_at=datetime.now(UTC).strftime("%d/%m/%Y"),
+    )
+
+    pdf_buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html, dest=pdf_buffer)
+    if pisa_status.err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur lors de la génération du certificat PDF.",
+        )
+
+    return Response(
+        content=pdf_buffer.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="certificat_conge_{numero}.pdf"'},
     )
 
 
