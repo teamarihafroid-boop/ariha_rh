@@ -9,7 +9,17 @@ import {
   type LeaveRequest,
   type LeaveType,
 } from '../../lib/api'
-import { Button, Card, ErrorBanner, PageHeader, StatusBadge, Table } from '../../components/ui'
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  StatusBadge,
+  Table,
+} from '../../components/ui'
 
 export function MyLeave() {
   const { user } = useAuth()
@@ -79,14 +89,17 @@ export function MyLeave() {
                 .map((b) => {
                   const type = leaveTypes.find((t) => t.id === b.leave_type_id)
                   return (
-                    <div key={b.leave_type_id} className="rounded-md bg-slate-50 p-3">
+                    <div
+                      key={b.leave_type_id}
+                      className="rounded-lg border border-slate-100 bg-brand-50 p-3"
+                    >
                       <div className="text-xs text-slate-500">{b.leave_type_libelle}</div>
-                      <div className="text-lg font-semibold text-slate-900">{b.solde} j</div>
+                      <div className="text-lg font-bold text-slate-900">{b.solde} j</div>
                       <div className="text-xs text-slate-400">
                         {b.jours_acquis} acquis · {b.jours_pris} pris
                       </div>
                       {type?.accrual_legal && (
-                        <div className="mt-1 text-[10px] text-blue-600">
+                        <div className="mt-1 text-[10px] font-medium text-brand-600">
                           Calculé automatiquement selon l'ancienneté
                         </div>
                       )}
@@ -143,7 +156,7 @@ export function MyLeave() {
                     <td className="px-4 py-3 text-right">
                       {r.status === 'approved' && (
                         <a
-                          className="text-sm text-blue-700 hover:underline"
+                          className="text-sm font-medium text-brand-700 hover:underline"
                           href={`/api/leave-requests/${r.id}/certificate`}
                           target="_blank"
                           rel="noreferrer"
@@ -218,12 +231,10 @@ function NewRequestForm({
     <Card className="p-4">
       <h2 className="mb-3 text-sm font-semibold text-slate-700">Nouvelle demande</h2>
       <ErrorBanner message={error} />
-      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+      <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
         {isResponsable && (
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700">Pour qui ?</label>
-            <select
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          <Field label="Pour qui ?" className="sm:col-span-2">
+            <Select
               value={employeeId ?? ''}
               onChange={(e) => setEmployeeId(Number(e.target.value))}
             >
@@ -233,13 +244,11 @@ function NewRequestForm({
                   {c.full_name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
         )}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Type de congé</label>
-          <select
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Field label="Type de congé">
+          <Select
             value={leaveTypeId ?? ''}
             onChange={(e) => setLeaveTypeId(Number(e.target.value))}
           >
@@ -248,40 +257,29 @@ function NewRequestForm({
                 {t.libelle}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Du</label>
-            <input
+          <Field label="Du">
+            <Input
               type="date"
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={dateDebut}
               onChange={(e) => setDateDebut(e.target.value)}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Au</label>
-            <input
+          </Field>
+          <Field label="Au">
+            <Input
               type="date"
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               value={dateFin}
               onChange={(e) => setDateFin(e.target.value)}
             />
-          </div>
+          </Field>
         </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Commentaire (optionnel)
-          </label>
-          <input
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            value={commentaire}
-            onChange={(e) => setCommentaire(e.target.value)}
-          />
-        </div>
+        <Field label="Commentaire (optionnel)" className="sm:col-span-2">
+          <Input value={commentaire} onChange={(e) => setCommentaire(e.target.value)} />
+        </Field>
         <div className="sm:col-span-2">
           <Button type="submit" disabled={submitting}>
             {submitting ? 'Envoi…' : 'Envoyer la demande'}

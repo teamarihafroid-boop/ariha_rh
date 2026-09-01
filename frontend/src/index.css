@@ -1,13 +1,28 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Ariha Froid brand blue — used for the header, nav, and links. */
+  --color-brand-900: #0b2e5c;
+  --color-brand-700: #17519f;
+  --color-brand-600: #1e5fb8;
+  --color-brand-500: #2e6fc4;
+  --color-brand-100: #e6eef9;
+  --color-brand-50: #f3f7fc;
+
+  /* Ariha Froid brand orange — used for primary calls to action. */
+  --color-accent-700: #c94a1c;
+  --color-accent-600: #e85624;
+  --color-accent-500: #f2703f;
+  --color-accent-100: #fdeae3;
+}
+
 :root {
   color-scheme: light;
 }
 
 body {
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--font-sans);
 }

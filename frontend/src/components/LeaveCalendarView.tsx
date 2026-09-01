@@ -126,46 +126,50 @@ export function LeaveCalendarView() {
       <ErrorBanner message={error} />
 
       <Card className="p-3">
-        <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500">
-          {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((d) => (
-            <div key={d} className="py-1">
-              {d}
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500">
+              {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((d) => (
+                <div key={d} className="py-1">
+                  {d}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((day, idx) => (
-            <div
-              key={idx}
-              className={`min-h-20 rounded border p-1 text-xs ${
-                day === null ? 'border-transparent' : 'border-slate-100'
-              } ${day !== null && holidaySet.has(day) ? 'bg-amber-50' : ''}`}
-            >
-              {day !== null && (
-                <>
-                  <div className="mb-1 font-medium text-slate-600">{day}</div>
-                  {holidaySet.has(day) && (
-                    <div className="mb-1 truncate text-[10px] text-amber-700">
-                      {holidaySet.get(day)}
-                    </div>
+            <div className="grid grid-cols-7 gap-1">
+              {cells.map((day, idx) => (
+                <div
+                  key={idx}
+                  className={`min-h-20 rounded-lg border p-1 text-xs ${
+                    day === null ? 'border-transparent' : 'border-slate-100'
+                  } ${day !== null && holidaySet.has(day) ? 'bg-amber-50' : ''}`}
+                >
+                  {day !== null && (
+                    <>
+                      <div className="mb-1 font-medium text-slate-600">{day}</div>
+                      {holidaySet.has(day) && (
+                        <div className="mb-1 truncate text-[10px] text-amber-700">
+                          {holidaySet.get(day)}
+                        </div>
+                      )}
+                      {(entriesByDay.get(day) ?? []).map((e) => (
+                        <div
+                          key={e.id}
+                          title={`${e.employee_nom} — ${e.leave_type_libelle} (${e.status})`}
+                          className="mb-0.5 truncate rounded px-1 text-[10px] text-white"
+                          style={{
+                            backgroundColor: e.couleur,
+                            opacity: e.status === 'pending' ? 0.55 : 1,
+                          }}
+                        >
+                          {e.employee_nom}
+                        </div>
+                      ))}
+                    </>
                   )}
-                  {(entriesByDay.get(day) ?? []).map((e) => (
-                    <div
-                      key={e.id}
-                      title={`${e.employee_nom} — ${e.leave_type_libelle} (${e.status})`}
-                      className="mb-0.5 truncate rounded px-1 text-[10px] text-white"
-                      style={{
-                        backgroundColor: e.couleur,
-                        opacity: e.status === 'pending' ? 0.55 : 1,
-                      }}
-                    >
-                      {e.employee_nom}
-                    </div>
-                  ))}
-                </>
-              )}
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </Card>
       <p className="mt-2 text-xs text-slate-400">

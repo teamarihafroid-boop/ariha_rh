@@ -7,7 +7,16 @@ import {
   type Holiday,
   type LeaveType,
 } from '../../lib/api'
-import { Button, Card, ErrorBanner, PageHeader, Table } from '../../components/ui'
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Table,
+} from '../../components/ui'
 
 export function Parametres() {
   const [departments, setDepartments] = useState<Department[]>([])
@@ -79,8 +88,8 @@ export function Parametres() {
                 <tr key={d.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-3 font-medium text-slate-800">{d.nom}</td>
                   <td className="px-4 py-3">
-                    <select
-                      className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                    <Select
+                      className="max-w-xs py-1.5"
                       value={d.leave_responsable_employee_id ?? ''}
                       onChange={(e) => setResponsable(d.id, e.target.value)}
                     >
@@ -90,7 +99,7 @@ export function Parametres() {
                           {emp.full_name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                 </tr>
               ))}
@@ -192,27 +201,26 @@ function LeaveTypesPanel() {
       <Card className="mb-4 p-4">
         <h3 className="mb-3 text-sm font-semibold text-slate-700">Ajouter un type de congé</h3>
         <form onSubmit={create} className="flex flex-wrap items-end gap-3">
-          <div className="flex-1">
-            <label className="mb-1 block text-xs text-slate-500">Libellé</label>
-            <input
+          <Field label="Libellé" className="min-w-[10rem] flex-1">
+            <Input
               required
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="py-1.5"
               value={newForm.libelle}
               onChange={(e) => setNewForm({ ...newForm, libelle: e.target.value })}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-slate-500">Couleur</label>
+          </Field>
+          <Field label="Couleur">
             <input
               type="color"
-              className="h-9 w-14 rounded-md border border-slate-300"
+              className="h-9 w-14 rounded-lg border border-slate-300"
               value={newForm.couleur}
               onChange={(e) => setNewForm({ ...newForm, couleur: e.target.value })}
             />
-          </div>
+          </Field>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
+              className="accent-brand-700"
               checked={newForm.deduit_du_solde}
               onChange={(e) => setNewForm({ ...newForm, deduit_du_solde: e.target.checked })}
             />
@@ -221,6 +229,7 @@ function LeaveTypesPanel() {
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
+              className="accent-brand-700"
               checked={newForm.accrual_legal}
               onChange={(e) => setNewForm({ ...newForm, accrual_legal: e.target.checked })}
             />
@@ -247,8 +256,8 @@ function LeaveTypesPanel() {
               editingId === t.id && editForm ? (
                 <tr key={t.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-3">
-                    <input
-                      className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                    <Input
+                      className="py-1"
                       value={editForm.libelle}
                       onChange={(e) => setEditForm({ ...editForm, libelle: e.target.value })}
                     />
@@ -256,7 +265,7 @@ function LeaveTypesPanel() {
                   <td className="px-4 py-3">
                     <input
                       type="color"
-                      className="h-8 w-12 rounded-md border border-slate-300"
+                      className="h-8 w-12 rounded-lg border border-slate-300"
                       value={editForm.couleur}
                       onChange={(e) => setEditForm({ ...editForm, couleur: e.target.value })}
                     />
@@ -264,6 +273,7 @@ function LeaveTypesPanel() {
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
+                      className="accent-brand-700"
                       checked={editForm.deduit_du_solde}
                       onChange={(e) =>
                         setEditForm({ ...editForm, deduit_du_solde: e.target.checked })
@@ -273,6 +283,7 @@ function LeaveTypesPanel() {
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
+                      className="accent-brand-700"
                       checked={editForm.accrual_legal}
                       onChange={(e) =>
                         setEditForm({ ...editForm, accrual_legal: e.target.checked })
@@ -284,7 +295,7 @@ function LeaveTypesPanel() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      className="mr-3 text-sm text-blue-700 hover:underline"
+                      className="mr-3 text-sm font-medium text-brand-700 hover:underline"
                       onClick={() => saveEdit(t.id)}
                     >
                       Enregistrer
@@ -324,7 +335,7 @@ function LeaveTypesPanel() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      className="mr-3 text-sm text-blue-700 hover:underline"
+                      className="mr-3 text-sm font-medium text-brand-700 hover:underline"
                       onClick={() => startEdit(t)}
                     >
                       Modifier
@@ -422,14 +433,15 @@ function HolidaysPanel() {
       />
       <ErrorBanner message={error} />
 
-      <Card className="mb-4 flex flex-wrap items-center gap-3 p-4">
-        <label className="text-sm font-medium text-slate-700">Année</label>
-        <input
-          type="number"
-          className="w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-        />
+      <Card className="mb-4 flex flex-wrap items-end gap-3 p-4">
+        <Field label="Année">
+          <Input
+            type="number"
+            className="w-24 py-1.5"
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+          />
+        </Field>
         <Button variant="secondary" onClick={generateFixed} disabled={busy}>
           {busy ? 'Génération…' : 'Générer les jours fériés fixes'}
         </Button>
@@ -440,26 +452,24 @@ function HolidaysPanel() {
           Ajouter une fête mobile (ou tout autre jour férié)
         </h3>
         <form onSubmit={addManual} className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="mb-1 block text-xs text-slate-500">Date</label>
-            <input
+          <Field label="Date">
+            <Input
               type="date"
               required
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="py-1.5"
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
             />
-          </div>
-          <div className="flex-1">
-            <label className="mb-1 block text-xs text-slate-500">Libellé</label>
-            <input
+          </Field>
+          <Field label="Libellé" className="min-w-[10rem] flex-1">
+            <Input
               required
               placeholder="ex. Aïd al-Fitr"
-              className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              className="py-1.5"
               value={newLibelle}
               onChange={(e) => setNewLibelle(e.target.value)}
             />
-          </div>
+          </Field>
           <Button type="submit">Ajouter</Button>
         </form>
       </Card>

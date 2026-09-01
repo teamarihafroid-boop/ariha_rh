@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type LeaveRequest, type LeaveStatus } from '../../lib/api'
-import { Button, Card, ErrorBanner, Modal, StatusBadge, Table } from '../../components/ui'
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Modal,
+  StatusBadge,
+  Table,
+  Textarea,
+} from '../../components/ui'
 
 type Filter = LeaveStatus | 'all'
 
@@ -40,13 +49,13 @@ export function LeaveQueue() {
 
   return (
     <div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
-            className={`rounded-full px-3 py-1 text-sm ${
-              filter === f.value ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'
+            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+              filter === f.value ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-700'
             }`}
           >
             {f.label}
@@ -112,7 +121,7 @@ export function LeaveQueue() {
                     </div>
                   ) : r.status === 'approved' ? (
                     <a
-                      className="text-sm text-blue-700 hover:underline"
+                      className="text-sm font-medium text-brand-700 hover:underline"
                       href={`/api/leave-requests/${r.id}/certificate`}
                       target="_blank"
                       rel="noreferrer"
@@ -185,17 +194,19 @@ function DecisionModal({
         j)
       </p>
       <ErrorBanner message={error} />
-      <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="comment">
-        {isApprove ? 'Commentaire (optionnel)' : 'Motif du refus'}
-      </label>
-      <textarea
-        id="comment"
-        className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
-        rows={3}
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-      />
-      <div className="flex justify-end gap-2">
+      <Field
+        label={isApprove ? 'Commentaire (optionnel)' : 'Motif du refus'}
+        htmlFor="comment"
+        className="mb-4"
+      >
+        <Textarea
+          id="comment"
+          rows={3}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+      </Field>
+      <div className="flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           Annuler
         </Button>

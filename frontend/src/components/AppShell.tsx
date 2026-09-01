@@ -14,23 +14,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold text-blue-800">ARIHA AI</span>
-            {user && (
-              <span className="text-xs text-slate-500">
-                {ROLE_LABELS[user.role] ?? user.role} · {user.email}
-              </span>
-            )}
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <img src="/logo.png" alt="" className="h-8 w-8 flex-none rounded-md" />
+            <div className="flex min-w-0 flex-col leading-tight sm:flex-row sm:items-baseline sm:gap-2">
+              <span className="text-sm font-bold text-brand-700">ARIHA AI</span>
+              {user && (
+                <span className="truncate text-xs text-slate-500">
+                  {ROLE_LABELS[user.role] ?? user.role} · {user.email}
+                </span>
+              )}
+            </div>
           </div>
           {user && (
-            <Button variant="secondary" onClick={() => logout()}>
+            <Button variant="secondary" className="flex-none" onClick={() => logout()}>
               Se déconnecter
             </Button>
           )}
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
   )
 }
