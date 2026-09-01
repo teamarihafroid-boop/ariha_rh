@@ -5,7 +5,9 @@ import { Login } from './routes/Login'
 import { HrLayout } from './routes/hr/HrLayout'
 import { LeaveQueue } from './routes/hr/LeaveQueue'
 import { LeaveCalendar } from './routes/hr/LeaveCalendar'
-import { Parametres } from './routes/hr/Parametres'
+import { ResponsablesPage } from './routes/hr/ResponsablesPage'
+import { LeaveTypesPage } from './routes/hr/LeaveTypesPage'
+import { HolidaysPage } from './routes/hr/HolidaysPage'
 import { MyLeave } from './routes/employee/MyLeave'
 import { LeaveOverview } from './routes/dg/LeaveOverview'
 
@@ -38,7 +40,10 @@ export default function App() {
       >
         <Route path="demandes" element={<LeaveQueue />} />
         <Route path="calendrier" element={<LeaveCalendar />} />
-        <Route path="parametres" element={<Parametres />} />
+        <Route path="parametres" element={<Navigate to="/hr/parametres/responsables" replace />} />
+        <Route path="parametres/responsables" element={<ResponsablesPage />} />
+        <Route path="parametres/types-conge" element={<LeaveTypesPage />} />
+        <Route path="parametres/feries" element={<HolidaysPage />} />
       </Route>
 
       <Route
