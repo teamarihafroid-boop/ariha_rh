@@ -81,6 +81,25 @@ def guess_day_columns(columns: list[str]) -> list[str]:
     return result
 
 
+def find_unmapped_day_values(
+    db: Session, rows: list[dict[str, str]], day_columns: list[str]
+) -> list[str]:
+    """Distinct raw pointeuse cell values (across the given day columns) that
+    don't match any active AttendanceCode by code_court or libelle. Surfaced
+    to HR at upload time so they can map each one to a code (via
+    ImportRequest.code_map) instead of it silently importing as a blank
+    cell — see run_import's code_map.get(raw_value) fallback."""
+    code_lookup = _build_code_lookup(db)
+    seen: dict[str, None] = {}
+    for row in rows:
+        for col in day_columns:
+            raw_value = (row.get(col) or "").strip()
+            if not raw_value or raw_value in seen:
+                continue
+            seen[raw_value] = None
+    return [v for v in seen if _normalize(v) not in code_lookup]
+
+
 def store_upload(content: bytes, filename: str) -> str:
     token = secrets.token_urlsafe(24)
     _redis.set(f"attendance_upload:{token}:content", content, ex=UPLOAD_TTL_SECONDS)

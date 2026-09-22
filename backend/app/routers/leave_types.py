@@ -54,6 +54,8 @@ def create_leave_type(
         deduit_du_solde=payload.deduit_du_solde,
         accrual_legal=payload.accrual_legal,
         code_court=payload.code_court,
+        employee_requestable=payload.employee_requestable,
+        certificate_kind=payload.certificate_kind,
     )
     db.add(leave_type)
     try:
@@ -99,6 +101,8 @@ def update_leave_type(
     leave_type.accrual_legal = payload.accrual_legal
     leave_type.is_active = payload.is_active
     leave_type.code_court = payload.code_court
+    leave_type.employee_requestable = payload.employee_requestable
+    leave_type.certificate_kind = payload.certificate_kind
     try:
         db.flush()
     except IntegrityError as exc:

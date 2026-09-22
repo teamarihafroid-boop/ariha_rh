@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 
 import pytest
 
@@ -26,6 +27,30 @@ def test_guess_identifier_column_matches_common_headers():
 def test_guess_day_columns_picks_1_to_31_only():
     columns = ["Nom", "01", "2", "31", "32", "Total"]
     assert attendance_service.guess_day_columns(columns) == ["01", "2", "31"]
+
+
+def test_find_unmapped_day_values_flags_values_matching_no_code(db, code_present):
+    # "PRST" doesn't match code_present's code_court ("P") or libelle
+    # ("Présent") even after accent/case normalization — genuinely unmapped,
+    # unlike e.g. "PRESENT" which normalizes to match "Présent".
+    rows = [
+        {"Nom": "Sara Alami", "01": "PRST", "02": "P"},
+        {"Nom": "Karim Idrissi", "01": "P", "02": "XYZ"},
+    ]
+    unmapped = attendance_service.find_unmapped_day_values(db, rows, ["01", "02"])
+    assert set(unmapped) == {"PRST", "XYZ"}
+
+
+def test_find_unmapped_day_values_matches_by_libelle_too(db, code_present):
+    rows = [{"Nom": "Sara Alami", "01": "Présent"}]
+    unmapped = attendance_service.find_unmapped_day_values(db, rows, ["01"])
+    assert unmapped == []
+
+
+def test_find_unmapped_day_values_ignores_blank_cells(db, code_present):
+    rows = [{"Nom": "Sara Alami", "01": "", "02": "  "}]
+    unmapped = attendance_service.find_unmapped_day_values(db, rows, ["01", "02"])
+    assert unmapped == []
 
 
 def test_read_table_parses_csv():
@@ -223,3 +248,107 @@ def test_export_monthly_state_xlsx_produces_a_real_workbook(db, employee_a):
     content = attendance_export_service.export_monthly_state_xlsx(db, 9, 2026)
     assert content[:2] == b"PK"  # xlsx is a zip archive
     assert len(content) > 1000
+
+
+def test_export_daily_grid_xlsx_still_shows_day_by_day_codes(
+    db, employee_a, active_status, code_present
+):
+    db.add(
+        AttendanceEntry(employee_id=employee_a.id, date=date(2026, 9, 7), code_id=code_present.id)
+    )
+    db.flush()
+
+    content = attendance_export_service.export_daily_grid_xlsx(db, 9, 2026)
+    assert content[:2] == b"PK"
+
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(BytesIO(content))
+    sheet = workbook.active
+    assert sheet.title == "Détail journalier"
+    header = [sheet.cell(row=3, column=c).value for c in range(1, 5)]
+    assert header == ["Collaborateur", "Département", 1, 2]
+
+
+# ----------------------------------------------------------- monthly summary --
+
+
+def test_build_monthly_summary_counts_conge_paye_and_reduces_jours_travailles(
+    db, employee_a, leave_type, hr_user
+):
+    leave_type.code_court = "CP"
+    db.flush()
+    grant_balance(db, employee_a.id, leave_type.id, 2026)
+    request = leave_service.create_request(
+        db,
+        employee_id=employee_a.id,
+        leave_type_id=leave_type.id,
+        date_debut=date(2026, 9, 7),
+        date_fin=date(2026, 9, 8),
+        commentaire=None,
+        submitted_by_user_id=hr_user.id,
+    )
+    leave_service.approve_request(db, request, decided_by_user_id=hr_user.id, comment=None)
+
+    rows = attendance_export_service.build_monthly_summary(db, 9, 2026)
+    row = next(r for r in rows if r["employee_id"] == employee_a.id)
+
+    jours_demandes = leave_service.jours_ouvres(db, date(2026, 9, 7), date(2026, 9, 8))
+    assert row["conge_paye"] == jours_demandes
+    assert row["jours_non_travailles"] == jours_demandes
+    assert row["jours_travailles"] == row["jours_ouvres_mois"] - jours_demandes
+
+
+def test_build_monthly_summary_counts_mission_days_without_reducing_jours_travailles(
+    db, employee_a
+):
+    mission_code = AttendanceCode(libelle="Mission", code_court="M", couleur="#1E88E5")
+    db.add(mission_code)
+    db.flush()
+    db.add(
+        AttendanceEntry(employee_id=employee_a.id, date=date(2026, 9, 7), code_id=mission_code.id)
+    )
+    db.flush()
+
+    rows = attendance_export_service.build_monthly_summary(db, 9, 2026)
+    row = next(r for r in rows if r["employee_id"] == employee_a.id)
+
+    assert row["mission"] == 1
+    # Mission is worked (off-site), not an absence — doesn't reduce jours_travailles.
+    assert row["jours_travailles"] == row["jours_ouvres_mois"]
+    assert row["jours_non_travailles"] == 0
+
+
+def test_build_monthly_summary_counts_absence_via_compte_absence_flag(db, employee_a):
+    absence_code = AttendanceCode(
+        libelle="Absence non justifiée", code_court="A", couleur="#E53935", compte_absence=True
+    )
+    db.add(absence_code)
+    db.flush()
+    db.add(
+        AttendanceEntry(employee_id=employee_a.id, date=date(2026, 9, 7), code_id=absence_code.id)
+    )
+    db.flush()
+
+    rows = attendance_export_service.build_monthly_summary(db, 9, 2026)
+    row = next(r for r in rows if r["employee_id"] == employee_a.id)
+
+    assert row["absence"] == 1
+    assert row["jours_travailles"] == row["jours_ouvres_mois"] - 1
+
+
+def test_export_xlsx_header_and_employee_row_match_etat_presence_template(db, employee_a):
+    import openpyxl
+
+    employee_a.matricule = "M-042"
+    db.flush()
+
+    content = attendance_export_service.export_monthly_state_xlsx(db, 9, 2026)
+    workbook = openpyxl.load_workbook(BytesIO(content))
+    sheet = workbook.active
+
+    header = [sheet.cell(row=3, column=c).value for c in range(1, 34)]
+    assert header == attendance_export_service._HEADERS
+    # MAT / Nom / Pénom columns.
+    row_values = [sheet.cell(row=4, column=c).value for c in (1, 2, 3)]
+    assert row_values == ["M-042", employee_a.nom, employee_a.prenom]

@@ -34,6 +34,7 @@ class LeaveRequestOut(BaseModel):
     employee_nom: str
     leave_type_id: int
     leave_type_libelle: str
+    has_certificate: bool
     date_debut: date
     date_fin: date
     nb_jours: Decimal

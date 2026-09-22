@@ -27,4 +27,15 @@ class LeaveType(Base):
     # Short display code for the monthly attendance export grid (e.g. "CP" for
     # Congé payé) — a day cell is too narrow for the full libelle.
     code_court: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # When False, an EMPLOYEE-role user (self-service or a department leave
+    # responsable acting on a colleague's behalf) cannot pick this type when
+    # creating a request — only HR can log one (see leave_service.create_request).
+    # Used for "Exceptionnel" (mariage/naissance/décès): those are handled by
+    # HR directly, not through employee self-service.
+    employee_requestable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Which real paper certificate template (if any) this type generates on
+    # approval — matches a template file under app/templates/. None means no
+    # certificate is offered for this type (e.g. "Maladie": the actual
+    # document is a doctor's note, not something this app produces).
+    certificate_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

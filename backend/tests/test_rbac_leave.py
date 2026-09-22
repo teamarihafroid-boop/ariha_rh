@@ -592,3 +592,102 @@ def test_cannot_submit_request_for_inactive_leave_type(client, db, employee_a_us
     resp = _create_request(client, db, csrf, employee_a_user.employee_id, leave_type.id)
     assert resp.status_code == 400
     assert "n'est plus actif" in resp.json()["detail"]
+
+
+def test_employee_cannot_request_non_employee_requestable_type(
+    client, db, employee_a_user, leave_type
+):
+    leave_type.employee_requestable = False
+    db.flush()
+    csrf = login(client, employee_a_user.email)
+    resp = _create_request(client, db, csrf, employee_a_user.employee_id, leave_type.id)
+    assert resp.status_code == 400
+    assert "ne peut être demandé que par la RH" in resp.json()["detail"]
+
+
+def test_responsable_cannot_submit_non_employee_requestable_type_for_colleague(
+    client, db, responsable_user, colleague_under_responsable, leave_type
+):
+    leave_type.employee_requestable = False
+    db.flush()
+    csrf = login(client, responsable_user.email)
+    resp = _create_request(client, db, csrf, colleague_under_responsable.id, leave_type.id)
+    assert resp.status_code == 400
+    assert "ne peut être demandé que par la RH" in resp.json()["detail"]
+
+
+def test_hr_can_still_submit_non_employee_requestable_type(
+    client, db, hr_user, employee_a, leave_type
+):
+    leave_type.employee_requestable = False
+    db.flush()
+    csrf = login(client, hr_user.email)
+    resp = _create_request(client, db, csrf, employee_a.id, leave_type.id)
+    assert resp.status_code == 201
+
+
+def test_certificate_blocked_for_leave_type_without_certificate_kind(
+    client, db, hr_user, employee_a_user, leave_type
+):
+    leave_type.certificate_kind = None
+    db.flush()
+    csrf = login(client, employee_a_user.email)
+    request_id = _create_request(
+        client, db, csrf, employee_a_user.employee_id, leave_type.id
+    ).json()["id"]
+
+    hr_csrf = login(client, hr_user.email)
+    client.post(
+        f"/api/leave-requests/{request_id}/approve",
+        json={"comment": "OK"},
+        headers={"X-CSRF-Token": hr_csrf},
+    )
+
+    login(client, employee_a_user.email)
+    resp = client.get(f"/api/leave-requests/{request_id}/certificate")
+    assert resp.status_code == 400
+    assert "Aucun certificat" in resp.json()["detail"]
+
+
+def test_recuperation_certificate_renders(client, db, hr_user, employee_a_user, employee_a):
+    from app.models import LeaveType
+
+    recup = LeaveType(
+        libelle="Récupération",
+        couleur="#43A047",
+        deduit_du_solde=True,
+        certificate_kind="recuperation",
+    )
+    db.add(recup)
+    db.flush()
+
+    csrf = login(client, employee_a_user.email)
+    request_id = _create_request(client, db, csrf, employee_a_user.employee_id, recup.id).json()[
+        "id"
+    ]
+
+    hr_csrf = login(client, hr_user.email)
+    client.post(
+        f"/api/leave-requests/{request_id}/approve",
+        json={"comment": "OK"},
+        headers={"X-CSRF-Token": hr_csrf},
+    )
+
+    login(client, employee_a_user.email)
+    resp = client.get(f"/api/leave-requests/{request_id}/certificate")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+
+
+def test_submitting_a_request_notifies_every_active_hr_user(
+    client, db, employee_a_user, leave_type, hr_user
+):
+    csrf = login(client, employee_a_user.email)
+    resp = _create_request(client, db, csrf, employee_a_user.employee_id, leave_type.id)
+    assert resp.status_code == 201
+
+    login(client, hr_user.email)
+    notif_resp = client.get("/api/notifications")
+    assert notif_resp.status_code == 200
+    types = {n["type"] for n in notif_resp.json()}
+    assert "leave_pending" in types

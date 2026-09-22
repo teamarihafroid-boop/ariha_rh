@@ -19,3 +19,4 @@ class LeaveRequestStatus(str, enum.Enum):
 class NotificationType(str, enum.Enum):
     LEAVE_APPROVED = "leave_approved"
     LEAVE_REJECTED = "leave_rejected"
+    LEAVE_PENDING = "leave_pending"

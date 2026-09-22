@@ -1,6 +1,21 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, type ImportResult, type UploadPreview } from '../../lib/api'
-import { Button, Card, ErrorBanner, Field, Input, PageHeader, Table } from '../../components/ui'
+import {
+  api,
+  ApiError,
+  type AttendanceCode,
+  type ImportResult,
+  type UploadPreview,
+} from '../../lib/api'
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Table,
+} from '../../components/ui'
 
 const MONTHS_FR = [
   'Janvier',
@@ -81,9 +96,16 @@ function ImportWizard() {
   const [preview, setPreview] = useState<UploadPreview | null>(null)
   const [identifierColumn, setIdentifierColumn] = useState('')
   const [dayColumns, setDayColumns] = useState<string[]>([])
+  const [codes, setCodes] = useState<AttendanceCode[]>([])
+  // Raw pointeuse value -> AttendanceCode id (as string; '' means "ignorer").
+  const [codeMap, setCodeMap] = useState<Record<string, string>>({})
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    api.get<AttendanceCode[]>('/attendance/codes').then(setCodes)
+  }, [])
 
   const analyze = async (e: FormEvent) => {
     e.preventDefault()
@@ -98,6 +120,7 @@ function ImportWizard() {
       setPreview(data)
       setIdentifierColumn(data.guessed_identifier_column ?? '')
       setDayColumns(data.guessed_day_columns)
+      setCodeMap({})
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erreur.')
     } finally {
@@ -114,12 +137,18 @@ function ImportWizard() {
     setBusy(true)
     setError(null)
     try {
+      const code_map = Object.fromEntries(
+        Object.entries(codeMap)
+          .filter(([, codeId]) => codeId !== '')
+          .map(([value, codeId]) => [value, Number(codeId)]),
+      )
       const data = await api.post<ImportResult>('/attendance/import', {
         token: preview.token,
         identifier_column: identifierColumn,
         day_columns: dayColumns,
         mois,
         annee,
+        code_map: Object.keys(code_map).length > 0 ? code_map : null,
       })
       setResult(data)
       setPreview(null)
@@ -236,6 +265,36 @@ function ImportWizard() {
             </div>
           </div>
 
+          {preview.unmapped_values.length > 0 && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="mb-2 text-sm font-medium text-amber-900">
+                Valeurs non reconnues — associez-les à un code de présence, sinon elles seront
+                importées sans code (case vide).
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {preview.unmapped_values.map((value) => (
+                  <div key={value} className="flex items-center gap-2">
+                    <span className="rounded bg-white px-2 py-1 font-mono text-xs text-slate-700 shadow-sm">
+                      {value || '(vide)'}
+                    </span>
+                    <Select
+                      className="py-1 text-xs"
+                      value={codeMap[value] ?? ''}
+                      onChange={(e) => setCodeMap((prev) => ({ ...prev, [value]: e.target.value }))}
+                    >
+                      <option value="">— Ignorer —</option>
+                      {codes.map((code) => (
+                        <option key={code.id} value={code.id}>
+                          {code.libelle} ({code.code_court})
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500">
@@ -303,7 +362,19 @@ function ExportPanel() {
         >
           Exporter en Excel
         </a>
+        <a
+          href={`/api/attendance/export/detail?mois=${mois}&annee=${annee}`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg bg-slate-100 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-200"
+        >
+          Détail journalier
+        </a>
       </div>
+      <p className="mt-2 text-xs text-slate-500">
+        « Exporter en Excel » suit le format ETAT PRESENCE (paie) ; « Détail journalier » donne le
+        pointage jour par jour, avec les conflits pointeuse/congé en évidence.
+      </p>
     </Card>
   )
 }

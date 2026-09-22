@@ -19,7 +19,16 @@ from sqlalchemy.orm import sessionmaker
 from app.core.security import hash_password
 from app.database import Base, get_db
 from app.main import app
-from app.models import Department, Employee, EmployeeStatus, LeaveType, User
+from app.models import (
+    ApplicationStage,
+    Department,
+    Employee,
+    EmployeeStatus,
+    JobOffer,
+    JobOfferStatus,
+    LeaveType,
+    User,
+)
 from app.models.enums import UserRole
 from app.services.leave_service import get_or_create_balance
 from app.services.session_store import _redis as redis_client
@@ -52,6 +61,17 @@ def db():
         connection.close()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_local_storage(tmp_path, monkeypatch):
+    """Uploaded files land on real disk via storage_service, unlike DB writes
+    which roll back with the `db` fixture's SAVEPOINT — without this, every
+    attachment/document test run would litter backend/var/uploads/ forever."""
+    from app.services import storage_service
+
+    settings = storage_service.get_settings()
+    monkeypatch.setattr(settings, "storage_local_dir", str(tmp_path / "uploads"))
+
+
 @pytest.fixture()
 def client(db):
     def _override_get_db():
@@ -73,8 +93,21 @@ def active_status(db) -> EmployeeStatus:
 
 
 @pytest.fixture()
+def inactive_status(db) -> EmployeeStatus:
+    status = EmployeeStatus(libelle="Sorti", couleur="#9E9E9E", is_active_status=False)
+    db.add(status)
+    db.flush()
+    return status
+
+
+@pytest.fixture()
 def leave_type(db) -> LeaveType:
-    lt = LeaveType(libelle="Congé payé", couleur="#0288D1", deduit_du_solde=True)
+    lt = LeaveType(
+        libelle="Congé payé",
+        couleur="#0288D1",
+        deduit_du_solde=True,
+        certificate_kind="conge_paye",
+    )
     db.add(lt)
     db.flush()
     return lt
@@ -209,6 +242,42 @@ def grant_balance(db, employee_id: int, leave_type_id: int, annee: int, jours=10
     balance = get_or_create_balance(db, employee_id, leave_type_id, annee)
     balance.jours_acquis = Decimal(jours)
     db.flush()
+
+
+@pytest.fixture()
+def job_offer_status(db) -> JobOfferStatus:
+    status = JobOfferStatus(libelle="Ouverte", couleur="#43A047")
+    db.add(status)
+    db.flush()
+    return status
+
+
+@pytest.fixture()
+def application_stage_recu(db) -> ApplicationStage:
+    stage = ApplicationStage(libelle="Reçu", ordre=1, couleur="#607D8B", is_hire_stage=False)
+    db.add(stage)
+    db.flush()
+    return stage
+
+
+@pytest.fixture()
+def application_stage_accepte(db) -> ApplicationStage:
+    stage = ApplicationStage(libelle="Accepté", ordre=6, couleur="#43A047", is_hire_stage=True)
+    db.add(stage)
+    db.flush()
+    return stage
+
+
+@pytest.fixture()
+def job_offer(db, department_no_responsable, job_offer_status) -> JobOffer:
+    offer = JobOffer(
+        titre="Technicien froid",
+        department_id=department_no_responsable.id,
+        status_id=job_offer_status.id,
+    )
+    db.add(offer)
+    db.flush()
+    return offer
 
 
 def login(client: TestClient, email: str, password: str = "TestPass123!") -> str:

@@ -226,6 +226,7 @@ def create_request(
     date_fin: date,
     commentaire: str | None,
     submitted_by_user_id: int,
+    submitted_by_hr: bool = False,
 ) -> LeaveRequest:
     if date_fin < date_debut:
         raise LeaveServiceError("La date de fin doit être postérieure ou égale à la date de début.")
@@ -236,6 +237,10 @@ def create_request(
         raise LeaveServiceError("Type de congé introuvable.")
     if not leave_type.is_active:
         raise LeaveServiceError("Ce type de congé n'est plus actif.")
+    if not submitted_by_hr and not leave_type.employee_requestable:
+        raise LeaveServiceError(
+            f"Le type « {leave_type.libelle} » ne peut être demandé que par la RH."
+        )
 
     nb_jours = jours_ouvres(db, date_debut, date_fin)
     if nb_jours <= 0:

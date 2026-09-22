@@ -8,7 +8,7 @@ from app.database import get_db
 from app.dependencies import AuthUser, get_current_user, verify_csrf
 from app.models import Employee
 from app.schemas.auth import LoginRequest, MeResponse
-from app.services import auth_service
+from app.services import auth_service, rate_limit_service
 from app.services.session_store import (
     CSRF_COOKIE_NAME,
     SESSION_COOKIE_NAME,
@@ -22,11 +22,19 @@ settings = get_settings()
 
 @router.post("/login", response_model=MeResponse)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    if rate_limit_service.is_rate_limited(payload.email):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de tentatives. Réessayez dans quelques minutes.",
+        )
+
     user = auth_service.authenticate(db, payload.email, payload.password)
     if user is None:
+        rate_limit_service.register_failed_attempt(payload.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Identifiants invalides."
         )
+    rate_limit_service.clear_attempts(payload.email)
     db.commit()
 
     signed_sid, csrf_token = create_session(user.id, user.role.value, user.employee_id)

@@ -10,10 +10,12 @@ from datetime import UTC, date, datetime
 from app.core.security import hash_password
 from app.database import SessionLocal
 from app.models import (
+    ApplicationStage,
     AttendanceCode,
     Department,
     Employee,
     EmployeeStatus,
+    JobOfferStatus,
     LeaveType,
     Position,
     User,
@@ -21,17 +23,23 @@ from app.models import (
 from app.models.enums import UserRole
 from app.services import holiday_service
 
-# (libelle, couleur, deduit_du_solde, accrual_legal, code_court)
+# (libelle, couleur, deduit_du_solde, accrual_legal, code_court, employee_requestable, certificate_kind)
 # accrual_legal=True only for "Congé payé": its jours_acquis is computed
 # automatically from tenure (leave_service.jours_acquis_legaux) rather than
 # entered manually — see that function's docstring for the legal basis.
 # code_court is the short label shown on the monthly attendance export grid.
+# employee_requestable=False for "Exceptionnel": HR logs those directly
+# (see leave_service.create_request's submitted_by_hr check) rather than
+# letting an employee self-serve a mariage/naissance/décès leave.
+# certificate_kind selects which real paper-form template (if any) the
+# approved request's PDF certificate uses — only Congé payé and
+# Récupération have one (see routers/leave.py's _CERTIFICATE_TEMPLATES).
 SEED_LEAVE_TYPES = [
-    ("Congé payé", "#0288D1", True, True, "CP"),
-    ("Récupération", "#43A047", True, False, "REC"),
-    ("Maladie", "#FB8C00", False, False, "MAL"),
-    ("Sans solde", "#8E24AA", False, False, "SS"),
-    ("Exceptionnel (mariage/naissance/décès)", "#546E7A", False, False, "EXC"),
+    ("Congé payé", "#0288D1", True, True, "CP", True, "conge_paye"),
+    ("Récupération", "#43A047", True, False, "REC", True, "recuperation"),
+    ("Maladie", "#FB8C00", False, False, "MAL", True, None),
+    ("Sans solde", "#8E24AA", False, False, "SS", True, None),
+    ("Exceptionnel (mariage/naissance/décès)", "#546E7A", False, False, "EXC", False, None),
 ]
 
 # (libelle, code_court, couleur, compte_absence)
@@ -40,6 +48,77 @@ SEED_ATTENDANCE_CODES = [
     ("Absence non justifiée", "A", "#E53935", True),
     ("Retard", "R", "#FB8C00", False),
     ("Mission", "M", "#1E88E5", False),
+]
+
+# (libelle, couleur)
+SEED_JOB_OFFER_STATUSES = [
+    ("Ouverte", "#43A047"),
+    ("En pause", "#FB8C00"),
+    ("Pourvue", "#0288D1"),
+    ("Annulée", "#9E9E9E"),
+]
+
+# (libelle, ordre, couleur, is_hire_stage) — is_hire_stage=True on "Accepté"
+# only: moving a card there is what proposes converting the candidate into an
+# Employee (see recruitment_service.hire_preview/hire_candidate).
+SEED_APPLICATION_STAGES = [
+    ("Reçu", 1, "#607D8B", False),
+    ("Préqualifié", 2, "#795548", False),
+    ("Entretien RH", 3, "#0288D1", False),
+    ("Entretien Manager", 4, "#1E88E5", False),
+    ("Test", 5, "#8E24AA", False),
+    ("Accepté", 6, "#43A047", True),
+    ("Refusé", 7, "#E53935", False),
+]
+
+# Real ARIHA FROID department structure (from the company's organigramme),
+# scaffolded so employees can be attached to the right box as they're
+# entered — these are org units, not fabricated people.
+SEED_DEPARTMENTS = [
+    "RH",
+    "Achats",
+    "Finance & Comptabilité",
+    "Commercial",
+    "Izdihar",
+    "Sakar",
+    "Comptoir",
+    "Stock",
+    "Technique",
+]
+
+# (intitule, department_nom | None) — department_nom=None for org-wide or
+# shared titles that show up across several departments in the organigramme.
+SEED_POSITIONS = [
+    ("Directeur Général", None),
+    ("Directeur des Opérations", None),
+    ("Responsable RH", "RH"),
+    ("Responsable Achats", "Achats"),
+    ("Acheteuse Senior", "Achats"),
+    ("Acheteuse", "Achats"),
+    ("RAF", "Finance & Comptabilité"),
+    ("Chargé de Recouvrement", "Finance & Comptabilité"),
+    ("Caissière", "Finance & Comptabilité"),
+    ("Chef Comptable", "Finance & Comptabilité"),
+    ("Comptable", "Finance & Comptabilité"),
+    ("Chargée Facturation", "Finance & Comptabilité"),
+    ("Directeur Ventes", "Commercial"),
+    ("Commercial Showroom", "Commercial"),
+    ("Commercial Site-Web", "Commercial"),
+    ("Commercial Terrain", "Commercial"),
+    ("Responsable de Stock", "Stock"),
+    ("Contrôleur", "Stock"),
+    ("Aide-Magasinier", "Stock"),
+    ("Chauffeur", "Stock"),
+    ("Agent de Production", "Stock"),
+    ("Responsable Technique", "Technique"),
+    ("Technicien", "Technique"),
+    ("Chargé(e) d'Etudes", "Technique"),
+    # Shared across Izdihar / Sakar / Comptoir / Stock.
+    ("Commercial", None),
+    ("Commerciale", None),
+    ("Magasinier", None),
+    ("Agent de Stock", None),
+    ("Agent de Comptoir", None),
 ]
 
 
@@ -60,7 +139,15 @@ def run() -> None:
             db.flush()
 
         if db.query(LeaveType).count() == 0:
-            for libelle, couleur, deduit, accrual_legal, code_court in SEED_LEAVE_TYPES:
+            for (
+                libelle,
+                couleur,
+                deduit,
+                accrual_legal,
+                code_court,
+                employee_requestable,
+                certificate_kind,
+            ) in SEED_LEAVE_TYPES:
                 db.add(
                     LeaveType(
                         libelle=libelle,
@@ -68,17 +155,34 @@ def run() -> None:
                         deduit_du_solde=deduit,
                         accrual_legal=accrual_legal,
                         code_court=code_court,
+                        employee_requestable=employee_requestable,
+                        certificate_kind=certificate_kind,
                     )
                 )
             db.flush()
         else:
-            # Backfill for a DB seeded before accrual_legal/code_court existed.
+            # Backfill for a DB seeded before accrual_legal/code_court/
+            # employee_requestable/certificate_kind existed.
             db.query(LeaveType).filter_by(libelle="Congé payé").update(
                 {"accrual_legal": True, "code_court": "CP"}
             )
-            for libelle, _couleur, _deduit, _accrual, code_court in SEED_LEAVE_TYPES:
+            for (
+                libelle,
+                _couleur,
+                _deduit,
+                _accrual,
+                code_court,
+                employee_requestable,
+                certificate_kind,
+            ) in SEED_LEAVE_TYPES:
                 db.query(LeaveType).filter_by(libelle=libelle, code_court=None).update(
                     {"code_court": code_court}
+                )
+                db.query(LeaveType).filter_by(libelle=libelle).update(
+                    {
+                        "employee_requestable": employee_requestable,
+                        "certificate_kind": certificate_kind,
+                    }
                 )
             db.flush()
 
@@ -94,7 +198,39 @@ def run() -> None:
                 )
             db.flush()
 
+        if db.query(JobOfferStatus).count() == 0:
+            for libelle, couleur in SEED_JOB_OFFER_STATUSES:
+                db.add(JobOfferStatus(libelle=libelle, couleur=couleur))
+            db.flush()
+
+        if db.query(ApplicationStage).count() == 0:
+            for libelle, ordre, couleur, is_hire_stage in SEED_APPLICATION_STAGES:
+                db.add(
+                    ApplicationStage(
+                        libelle=libelle, ordre=ordre, couleur=couleur, is_hire_stage=is_hire_stage
+                    )
+                )
+            db.flush()
+
         active_status = db.query(EmployeeStatus).filter_by(libelle="Actif").first()
+
+        departments_by_nom: dict[str, Department] = {}
+        for nom in SEED_DEPARTMENTS:
+            dept = db.query(Department).filter_by(nom=nom).first()
+            if dept is None:
+                dept = Department(nom=nom)
+                db.add(dept)
+                db.flush()
+            departments_by_nom[nom] = dept
+
+        for intitule, department_nom in SEED_POSITIONS:
+            department_id = departments_by_nom[department_nom].id if department_nom else None
+            existing = (
+                db.query(Position).filter_by(intitule=intitule, department_id=department_id).first()
+            )
+            if existing is None:
+                db.add(Position(intitule=intitule, department_id=department_id))
+        db.flush()
 
         department = db.query(Department).filter_by(nom="Direction").first()
         if department is None:

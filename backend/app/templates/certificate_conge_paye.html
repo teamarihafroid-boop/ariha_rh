@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Autorisation de congé — {{ employee.full_name }}</title>
+<style>
+  @page { size: A4; margin: 2cm 2.2cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; }
+
+  table.letterhead { width: 100%; margin-bottom: 10px; }
+  table.letterhead td { vertical-align: middle; text-align: center; }
+  .brand-name { font-size: 20pt; font-weight: bold; letter-spacing: .5px; color: #1a1a1a; }
+
+  h1 { text-align: center; font-size: 15pt; font-weight: bold; text-transform: uppercase;
+    text-decoration: underline; margin: 8px 0 18px; }
+
+  table.numero { width: 100%; margin-bottom: 18px; border-bottom: 1px solid #1a1a1a; }
+  table.numero td { padding-bottom: 3px; font-size: 10.5pt; }
+  table.numero td.label { font-weight: bold; font-style: italic; text-decoration: underline; }
+  table.numero td.value { text-align: center; font-weight: bold; }
+
+  table.info { width: 100%; margin-bottom: 14px; }
+  table.info td { padding: 3px 0; font-size: 10pt; vertical-align: top; }
+  table.info td.label { font-weight: bold; width: 62%; }
+  table.info td.value { width: 38%; }
+
+  .signature-row { width: 100%; margin: 16px 0 20px; }
+  .signature-row td { text-align: right; font-weight: bold; font-style: italic; font-size: 9.5pt; }
+  .sig-space { height: 34px; }
+
+  .section-title { font-weight: bold; font-style: italic; text-decoration: underline;
+    font-size: 10.5pt; margin: 16px 0 8px; }
+
+  table.figures { width: 100%; margin-bottom: 6px; }
+  table.figures td { padding: 3px 0; font-size: 10pt; }
+  table.figures td.label { font-weight: bold; width: 68%; }
+  table.figures td.value { width: 32%; text-align: right; }
+
+  .visa { text-align: right; font-weight: bold; font-style: italic; font-size: 9.5pt; margin: 6px 0 4px; }
+
+  .divider { border-top: 1px solid #1a1a1a; margin: 18px 0 10px; }
+
+  .admin-note { font-style: italic; font-size: 9pt; margin-bottom: 6px; }
+  table.admin { width: 100%; }
+  table.admin td { padding: 3px 0; font-size: 10pt; }
+  table.admin td.label { font-weight: bold; width: 62%; }
+  table.admin td.value { width: 38%; text-align: right; font-weight: bold; }
+</style>
+</head>
+<body>
+
+  <table class="letterhead">
+    <tr>
+      <td style="width:44px;"><img src="{{ logo_data_uri }}" width="38" height="38"/></td>
+      <td class="brand-name">ARIHA FROID</td>
+      <td style="width:44px;"></td>
+    </tr>
+  </table>
+
+  <h1>Autorisation de congé</h1>
+
+  <table class="numero">
+    <tr>
+      <td class="label">Demande de congé N° :</td>
+      <td class="value">{{ numero }}</td>
+    </tr>
+  </table>
+
+  <table class="info">
+    <tr><td class="label">Nom &amp; Prénom :</td><td class="value">{{ employee.full_name.upper() }}</td></tr>
+    <tr><td class="label">Fonction</td><td class="value">{{ (employee.position.intitule if employee.position else "—").upper() }}</td></tr>
+    <tr><td class="label">Département</td><td class="value">{{ (employee.department.nom if employee.department else "—").upper() }}</td></tr>
+    <tr><td class="label">Date de départ (1<sup>er</sup> jour de congé) :</td><td class="value">{{ entry.date_debut.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><td class="label">Date retour (date de reprise de travail) :</td><td class="value">{{ date_retour.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><td class="label">Date de Repos :</td><td class="value">{{ repos_labels or "-" }}</td></tr>
+    <tr><td class="label">Férié :</td><td class="value">{{ feries_labels or "-" }}</td></tr>
+  </table>
+
+  <table class="signature-row">
+    <tr><td>Signature de l'intéressé :<div class="sig-space"></div></td></tr>
+  </table>
+
+  <div class="section-title">Situations congés payés : ( réservé à la DRH )</div>
+  <table class="figures">
+    <tr><td class="label">Droits au congé contractuel :</td><td class="value">{{ jours_acquis }} jours</td></tr>
+    <tr><td class="label">Reliquat des congés</td><td class="value">{{ solde_avant }} jours</td></tr>
+    <tr><td class="label">Nombre de jours de congé demandés</td><td class="value">{{ entry.nb_jours }} jours</td></tr>
+    <tr><td class="label">Nouveau reliquat - {{ annee }}</td><td class="value">{{ solde_apres }} jours</td></tr>
+  </table>
+  <div class="visa">Visa DRH :<div class="sig-space"></div></div>
+
+  <div class="section-title">Autorisation du supérieur hiérarchique :</div>
+  <table class="figures">
+    <tr><td class="label">Congé autorisé</td><td class="value">{{ entry.nb_jours }} jours</td></tr>
+    <tr><td class="label">Observations :</td><td class="value">{{ entry.decision_comment or "" }}</td></tr>
+  </table>
+  <div class="visa">Signature Du chef de département :<div class="sig-space"></div></div>
+  <div class="visa">Signature Du Directeur Général :<div class="sig-space"></div></div>
+
+  <div class="divider"></div>
+  <div class="admin-note">(Réservé à l'administration ou à la DRH) :</div>
+  <table class="admin">
+    <tr><td class="label">Date reprise de travail :</td><td class="value">{{ date_retour.strftime("%d/%m/%Y") }}</td></tr>
+    <tr><td class="label">Nouveau solde à la date de retour :</td><td class="value">{{ solde_apres }} jours</td></tr>
+  </table>
+
+</body>
+</html>

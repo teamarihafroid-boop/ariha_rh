@@ -1,0 +1,124 @@
+/* Classic CSS org-chart connector-line technique: each <li> draws a vertical
+   stub up to its parent's row and a horizontal bar shared with its siblings,
+   trimmed at the first/last child so the bar doesn't overshoot the group. */
+
+.orgchart-tree ul {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 24px;
+  margin: 0;
+}
+
+.orgchart-tree > ul {
+  padding-top: 0;
+}
+
+.orgchart-tree li {
+  list-style: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 10px 0 10px;
+}
+
+.orgchart-tree > ul > li {
+  padding-top: 0;
+}
+
+.orgchart-tree li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 24px;
+  border-left: 1.5px solid #94a3b8;
+}
+
+.orgchart-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  border-top: 1.5px solid #94a3b8;
+}
+
+.orgchart-tree > ul > li::before,
+.orgchart-tree > ul > li::after {
+  display: none;
+}
+
+.orgchart-tree li:first-child::after {
+  left: 50%;
+}
+
+.orgchart-tree li:last-child::after {
+  right: 50%;
+}
+
+.orgchart-tree li:only-child::after,
+.orgchart-tree li:only-child::before {
+  display: none;
+}
+
+.orgchart-box {
+  display: inline-block;
+  min-width: 120px;
+  max-width: 190px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+}
+
+.orgchart-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.orgchart-position {
+  font-size: 10.5px;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+.orgchart-reports-to {
+  font-size: 9.5px;
+  margin-top: 3px;
+  opacity: 0.85;
+  font-style: italic;
+}
+
+.orgchart-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.orgchart-direction {
+  background: #e8792a;
+  color: #ffffff;
+}
+.orgchart-departement {
+  background: #2c6e74;
+  color: #ffffff;
+}
+.orgchart-responsable {
+  background: #c7daf3;
+  color: #0f2a4a;
+}
+.orgchart-employe {
+  background: #1f4e86;
+  color: #ffffff;
+}
+.orgchart-recrutement {
+  background: #d9342b;
+  color: #ffffff;
+}

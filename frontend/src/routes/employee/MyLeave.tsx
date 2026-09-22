@@ -154,7 +154,7 @@ export function MyLeave() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {r.status === 'approved' && (
+                      {r.status === 'approved' && r.has_certificate && (
                         <a
                           className="text-sm font-medium text-brand-700 hover:underline"
                           href={`/api/leave-requests/${r.id}/certificate`}
@@ -198,7 +198,8 @@ function NewRequestForm({
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (leaveTypes.length && leaveTypeId === null) setLeaveTypeId(leaveTypes[0].id)
+    const requestable = leaveTypes.filter((t) => t.employee_requestable)
+    if (requestable.length && leaveTypeId === null) setLeaveTypeId(requestable[0].id)
     if (selfId !== null && employeeId === null) setEmployeeId(selfId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leaveTypes, selfId])
@@ -252,11 +253,13 @@ function NewRequestForm({
             value={leaveTypeId ?? ''}
             onChange={(e) => setLeaveTypeId(Number(e.target.value))}
           >
-            {leaveTypes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.libelle}
-              </option>
-            ))}
+            {leaveTypes
+              .filter((t) => t.employee_requestable)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.libelle}
+                </option>
+              ))}
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-3">

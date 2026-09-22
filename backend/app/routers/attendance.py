@@ -15,6 +15,7 @@ from app.schemas.attendance import (
     ImportRequest,
     ImportResultOut,
     MonthlyStateOut,
+    MonthlySummaryOut,
     UploadPreviewOut,
 )
 from app.services import attendance_export_service, attendance_service, audit_service
@@ -138,6 +139,7 @@ def update_code(
 async def upload_timesheet(
     file: UploadFile = File(...),
     current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
 ):
     content = await file.read()
     try:
@@ -146,13 +148,15 @@ async def upload_timesheet(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     token = attendance_service.store_upload(content, file.filename or "import")
+    guessed_day_columns = attendance_service.guess_day_columns(columns)
     return UploadPreviewOut(
         token=token,
         columns=columns,
         sample_rows=rows[:5],
         guessed_identifier_column=attendance_service.guess_identifier_column(columns),
-        guessed_day_columns=attendance_service.guess_day_columns(columns),
+        guessed_day_columns=guessed_day_columns,
         nb_rows=len(rows),
+        unmapped_values=attendance_service.find_unmapped_day_values(db, rows, guessed_day_columns),
     )
 
 
@@ -227,6 +231,39 @@ def monthly_state(
     return attendance_export_service.build_monthly_state(db, mois, annee)
 
 
+@router.get("/etat/resume", response_model=MonthlySummaryOut)
+def monthly_summary_for_employee(
+    employee_id: int,
+    mois: int = Query(..., ge=1, le=12),
+    annee: int = Query(...),
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    rows = attendance_export_service.build_monthly_summary(
+        db, mois, annee, employee_ids=[employee_id]
+    )
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Collaborateur introuvable."
+        )
+    row = rows[0]
+    return MonthlySummaryOut(
+        employee_id=row["employee_id"],
+        mois=mois,
+        annee=annee,
+        jours_ouvres_mois=row["jours_ouvres_mois"],
+        jours_travailles=row["jours_travailles"],
+        conge_paye=row["conge_paye"],
+        recuperation=row["recuperation"],
+        conge_exceptionnel=row["conge_exceptionnel"],
+        absence_maladie=row["absence_maladie"],
+        conge_sans_solde=row["conge_sans_solde"],
+        absence=row["absence"],
+        mission=row["mission"],
+        jours_non_travailles=row["jours_non_travailles"],
+    )
+
+
 @router.get("/export")
 def export_state(
     mois: int = Query(..., ge=1, le=12),
@@ -236,6 +273,22 @@ def export_state(
 ):
     content = attendance_export_service.export_monthly_state_xlsx(db, mois, annee)
     filename = f"etat_presence_{annee}_{mois:02d}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/detail")
+def export_daily_grid(
+    mois: int = Query(..., ge=1, le=12),
+    annee: int = Query(...),
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    content = attendance_export_service.export_daily_grid_xlsx(db, mois, annee)
+    filename = f"detail_journalier_{annee}_{mois:02d}.xlsx"
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -23,6 +23,34 @@ def test_login_unknown_email_fails(client):
     assert resp.status_code == 401
 
 
+def test_login_rate_limited_after_five_failed_attempts(client, hr_user):
+    for _ in range(5):
+        resp = client.post("/api/auth/login", json={"email": hr_user.email, "password": "wrong"})
+        assert resp.status_code == 401
+
+    resp = client.post("/api/auth/login", json={"email": hr_user.email, "password": "wrong"})
+    assert resp.status_code == 429
+
+    # Even the correct password is blocked once rate-limited — this is a
+    # per-account lockout window, not just "reject bad guesses."
+    resp = client.post("/api/auth/login", json={"email": hr_user.email, "password": "TestPass123!"})
+    assert resp.status_code == 429
+
+
+def test_login_success_clears_prior_failed_attempts(client, hr_user):
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": hr_user.email, "password": "wrong"})
+
+    resp = client.post("/api/auth/login", json={"email": hr_user.email, "password": "TestPass123!"})
+    assert resp.status_code == 200
+
+    # A fresh run of wrong guesses afterward starts from zero again, not
+    # from where the pre-success attempts left off.
+    for _ in range(4):
+        resp = client.post("/api/auth/login", json={"email": hr_user.email, "password": "wrong"})
+        assert resp.status_code == 401
+
+
 def test_me_requires_session(client):
     resp = client.get("/api/auth/me")
     assert resp.status_code == 401

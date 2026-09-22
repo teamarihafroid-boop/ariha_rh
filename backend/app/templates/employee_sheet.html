@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Fiche salarié — {{ employee.full_name }}</title>
+<style>
+  @page { size: A4; margin: 1.6cm 1.8cm 1.4cm 1.8cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #000000; }
+
+  /* ---------- En-tête : cadre photo, logo, titre ---------- */
+  table.header-block { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  table.header-block td { vertical-align: top; }
+  .photo-box, .photo-spacer { width: 2.6cm; height: 3.2cm; }
+  .photo-box { border: 1px solid #000000; }
+  .header-center { text-align: center; padding: 0 10px; }
+  .brand-name { font-size: 12pt; font-weight: bold; color: #17519F; }
+  h1 { font-size: 13pt; letter-spacing: .5px; text-transform: uppercase; color: #000000; margin: 8px 0 0; }
+
+  /* ---------- Structure commune des sections ---------- */
+  .section { margin-bottom: 10px; }
+  .section-title { font-size: 10pt; font-weight: bold; text-decoration: underline; margin: 0 0 3px; }
+
+  table.grid { width: 100%; border-collapse: collapse; border: 1px solid #000000; }
+  table.grid td { border: 1px solid #000000; padding: 3px 6px; font-size: 10pt; width: 50%; }
+
+  /* ---------- Documents administratifs : une case par document ---------- */
+  table.doc-checklist { width: 100%; border-collapse: collapse; border: 1px solid #000000; }
+  table.doc-checklist td { border: 1px solid #000000; padding: 3px 6px; font-size: 10pt; vertical-align: middle; }
+  table.doc-checklist td.checkbox { width: 24px; text-align: center; }
+  table.doc-checklist td.checkbox span {
+    display: block; border: 1px solid #000000; width: 10px; height: 10px; margin: 0 auto;
+    font-size: 8pt; font-weight: bold; line-height: 10px; text-align: center;
+  }
+
+  /* ---------- Contacts d'urgence ---------- */
+  table.contacts th { text-align: left; font-size: 8pt; text-transform: uppercase;
+    border: 1px solid #000000; padding: 3px 6px; }
+  table.contacts td { font-size: 9.5pt; border: 1px solid #000000; padding: 4px 6px; }
+
+  .footer { margin-top: 16px; font-size: 7.5pt; color: #6B7684; text-align: center;
+    border-top: 1px solid #D5DAE0; padding-top: 4px; }
+</style>
+</head>
+<body>
+
+  <!-- En-tête -->
+  <table class="header-block">
+    <tr>
+      <td class="photo-box">&nbsp;</td>
+      <td class="header-center">
+        <img src="{{ logo_data_uri }}" width="26" height="26"/>
+        <div class="brand-name">ARIHA FROID</div>
+        <h1>Fiche salarié &ndash; Dossier administratif</h1>
+      </td>
+      <td class="photo-spacer">&nbsp;</td>
+    </tr>
+  </table>
+
+  <!-- Informations générales -->
+  <div class="section">
+    <div class="section-title">Informations générales</div>
+    <table class="grid">
+      <tr>
+        <td>Nom &amp; Prénom : {{ employee.full_name }}</td>
+        <td>Matricule : {{ employee.matricule or "" }}</td>
+      </tr>
+      <tr>
+        <td>Date de naissance : {{ employee.date_naissance.strftime("%d/%m/%Y") if employee.date_naissance else "" }}</td>
+        <td>CIN : {{ employee.cin or "" }}</td>
+      </tr>
+      <tr>
+        <td>Adresse : {{ employee.adresse or "" }}</td>
+        <td>Téléphone : {{ employee.telephone or "" }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Informations professionnelles -->
+  <div class="section">
+    <div class="section-title">Informations professionnelles</div>
+    <table class="grid">
+      <tr><td colspan="2">Poste : {{ employee.position.intitule if employee.position else "" }}</td></tr>
+      <tr><td colspan="2">Département : {{ employee.department.nom if employee.department else "" }}</td></tr>
+      <tr><td colspan="2">Type de contrat : {{ employee.type_contrat or "" }}</td></tr>
+      <tr><td colspan="2">Date d'embauche : {{ employee.date_embauche.strftime("%d/%m/%Y") if employee.date_embauche else "" }}</td></tr>
+    </table>
+  </div>
+
+  <!-- Documents administratifs -->
+  <div class="section">
+    <div class="section-title">Documents administratifs</div>
+    <table class="doc-checklist">
+      {% for doc_type in document_checklist %}
+      <tr>
+        <td class="checkbox"><span>{{ "X" if doc_type in uploaded_types else "" }}</span></td>
+        <td>{{ doc_type }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <!-- Contacts d'urgence (uniquement si renseignés) -->
+  {% if employee.emergency_contacts %}
+  <div class="section">
+    <div class="section-title">Contacts d'urgence</div>
+    <table class="contacts">
+      <tr><th>Nom</th><th>Lien</th><th>Téléphone</th></tr>
+      {% for c in employee.emergency_contacts %}
+      <tr><td>{{ c.nom }}</td><td>{{ c.lien or "—" }}</td><td>{{ c.telephone }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Fin de contrat -->
+  <div class="section">
+    <div class="section-title">Fin de contrat</div>
+    <table class="grid">
+      <tr>
+        <td>Date de sortie : {{ employee.date_sortie.strftime("%d/%m/%Y") if employee.date_sortie else "" }}</td>
+        <td>Motif : {{ employee.motif_sortie or "" }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="footer">
+    Document généré le {{ generated_at }} par ARIHA AI.
+  </div>
+
+</body>
+</html>

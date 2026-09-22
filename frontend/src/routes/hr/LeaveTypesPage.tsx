@@ -1,6 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, type LeaveType } from '../../lib/api'
-import { Button, Card, ErrorBanner, Field, Input, PageHeader, Table } from '../../components/ui'
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Table,
+} from '../../components/ui'
 
 interface LeaveTypeForm {
   libelle: string
@@ -9,7 +18,15 @@ interface LeaveTypeForm {
   accrual_legal: boolean
   is_active?: boolean
   code_court: string
+  employee_requestable: boolean
+  certificate_kind: string
 }
+
+const CERTIFICATE_OPTIONS = [
+  { value: '', label: 'Aucun' },
+  { value: 'conge_paye', label: 'Autorisation de congé' },
+  { value: 'recuperation', label: 'Demande de récupération' },
+]
 
 export function LeaveTypesPage() {
   const [types, setTypes] = useState<LeaveType[]>([])
@@ -22,6 +39,8 @@ export function LeaveTypesPage() {
     deduit_du_solde: true,
     accrual_legal: false,
     code_court: '',
+    employee_requestable: true,
+    certificate_kind: '',
   })
 
   const load = async () => {
@@ -42,13 +61,18 @@ export function LeaveTypesPage() {
     if (!newForm.libelle.trim()) return
     setError(null)
     try {
-      await api.post('/leave-types', newForm)
+      await api.post('/leave-types', {
+        ...newForm,
+        certificate_kind: newForm.certificate_kind || null,
+      })
       setNewForm({
         libelle: '',
         couleur: '#0288D1',
         deduit_du_solde: true,
         accrual_legal: false,
         code_court: '',
+        employee_requestable: true,
+        certificate_kind: '',
       })
       await load()
     } catch (err) {
@@ -65,6 +89,8 @@ export function LeaveTypesPage() {
       accrual_legal: t.accrual_legal,
       is_active: t.is_active,
       code_court: t.code_court ?? '',
+      employee_requestable: t.employee_requestable,
+      certificate_kind: t.certificate_kind ?? '',
     })
   }
 
@@ -72,7 +98,10 @@ export function LeaveTypesPage() {
     if (!editForm) return
     setError(null)
     try {
-      await api.put(`/leave-types/${id}`, editForm)
+      await api.put(`/leave-types/${id}`, {
+        ...editForm,
+        certificate_kind: editForm.certificate_kind || null,
+      })
       setEditingId(null)
       setEditForm(null)
       await load()
@@ -145,6 +174,28 @@ export function LeaveTypesPage() {
             />
             Accrual automatique (ancienneté)
           </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="accent-brand-700"
+              checked={newForm.employee_requestable}
+              onChange={(e) => setNewForm({ ...newForm, employee_requestable: e.target.checked })}
+            />
+            Demandable par l'employé
+          </label>
+          <Field label="Certificat">
+            <Select
+              className="py-1.5"
+              value={newForm.certificate_kind}
+              onChange={(e) => setNewForm({ ...newForm, certificate_kind: e.target.value })}
+            >
+              {CERTIFICATE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Button type="submit">Ajouter</Button>
         </form>
       </Card>
@@ -158,6 +209,8 @@ export function LeaveTypesPage() {
               <th className="px-4 py-2">Couleur</th>
               <th className="px-4 py-2">Déduit du solde</th>
               <th className="px-4 py-2">Accrual auto</th>
+              <th className="px-4 py-2">Demandable employé</th>
+              <th className="px-4 py-2">Certificat</th>
               <th className="px-4 py-2">Statut</th>
               <th className="px-4 py-2" />
             </tr>
@@ -211,6 +264,31 @@ export function LeaveTypesPage() {
                       }
                     />
                   </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="accent-brand-700"
+                      checked={editForm.employee_requestable}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, employee_requestable: e.target.checked })
+                      }
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Select
+                      className="py-1"
+                      value={editForm.certificate_kind}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, certificate_kind: e.target.value })
+                      }
+                    >
+                      {CERTIFICATE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </td>
                   <td className="px-4 py-3 text-slate-500">
                     {editForm.is_active ? 'Actif' : 'Inactif'}
                   </td>
@@ -246,6 +324,13 @@ export function LeaveTypesPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-600">{t.deduit_du_solde ? 'Oui' : 'Non'}</td>
                   <td className="px-4 py-3 text-slate-600">{t.accrual_legal ? 'Oui' : 'Non'}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {t.employee_requestable ? 'Oui' : 'RH uniquement'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {CERTIFICATE_OPTIONS.find((o) => o.value === (t.certificate_kind ?? ''))
+                      ?.label ?? 'Aucun'}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={

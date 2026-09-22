@@ -48,6 +48,7 @@ def _serialize(r: LeaveRequest) -> LeaveRequestOut:
         employee_nom=r.employee.full_name,
         leave_type_id=r.leave_type_id,
         leave_type_libelle=r.leave_type.libelle,
+        has_certificate=r.leave_type.certificate_kind is not None,
         date_debut=r.date_debut,
         date_fin=r.date_fin,
         nb_jours=r.nb_jours,
@@ -106,6 +107,7 @@ def create_leave_request(
             date_fin=payload.date_fin,
             commentaire=payload.commentaire,
             submitted_by_user_id=current_user.id,
+            submitted_by_hr=current_user.role == UserRole.HR,
         )
     except leave_service.LeaveServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -119,6 +121,7 @@ def create_leave_request(
         actor_email=current_user.email,
         description=f"Demande de congé créée pour employee_id={request.employee_id}",
     )
+    notification_service.notify_leave_pending(db, request)
     db.commit()
     db.refresh(request)
     return _serialize(request)
@@ -269,6 +272,12 @@ def cancel_leave_request(
     return _serialize(request)
 
 
+_CERTIFICATE_TEMPLATES = {
+    "conge_paye": "certificate_conge_paye.html",
+    "recuperation": "certificate_recuperation.html",
+}
+
+
 @router.get("/leave-requests/{request_id}/certificate")
 def leave_certificate(
     request_id: int,
@@ -281,6 +290,12 @@ def leave_certificate(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Le certificat n'est disponible qu'une fois la demande approuvée.",
+        )
+    template_name = _CERTIFICATE_TEMPLATES.get(request.leave_type.certificate_kind or "")
+    if template_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Aucun certificat n'existe pour le type « {request.leave_type.libelle} ».",
         )
 
     employee = request.employee
@@ -308,13 +323,15 @@ def leave_certificate(
     solde_avant = solde_apres + request.nb_jours
     numero = f"{annee % 100:02d}{request.id:03d}"
 
-    html = templates.env.get_template("leave_certificate.html").render(
+    html = templates.env.get_template(template_name).render(
         entry=request,
         employee=employee,
         numero=numero,
+        annee=annee,
         date_retour=request.date_fin + timedelta(days=1),
         repos_labels=repos_labels,
         feries_labels=feries_labels,
+        jours_acquis=jours_acquis,
         solde_avant=solde_avant,
         solde_apres=solde_apres,
         logo_data_uri=_LOGO_DATA_URI,

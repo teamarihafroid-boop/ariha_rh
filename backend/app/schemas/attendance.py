@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from pydantic import BaseModel
 
 
@@ -36,6 +38,12 @@ class UploadPreviewOut(BaseModel):
     guessed_identifier_column: str | None
     guessed_day_columns: list[str]
     nb_rows: int
+    # Raw cell values (from the guessed day columns) that don't match any
+    # configured AttendanceCode — HR maps each one to a code before
+    # confirming, instead of it silently importing as a blank/unrecognized
+    # cell. Recomputed against the exact day-column selection at /import
+    # time isn't needed: HR reviews this list before confirming either way.
+    unmapped_values: list[str]
 
 
 class ImportRequest(BaseModel):
@@ -78,3 +86,24 @@ class MonthlyStateOut(BaseModel):
     nb_jours: int
     nb_conflits: int
     rows: list[MonthlyStateRow]
+
+
+class MonthlySummaryOut(BaseModel):
+    """Per-employee monthly totals matching the presence-related columns of
+    ARIHA FROID's real "ETAT DE PAIE" spreadsheet — see
+    attendance_export_service.build_monthly_summary for how each is
+    computed."""
+
+    employee_id: int
+    mois: int
+    annee: int
+    jours_ouvres_mois: Decimal
+    jours_travailles: Decimal
+    conge_paye: Decimal
+    recuperation: Decimal
+    conge_exceptionnel: Decimal
+    absence_maladie: Decimal
+    conge_sans_solde: Decimal
+    absence: Decimal
+    mission: int
+    jours_non_travailles: Decimal

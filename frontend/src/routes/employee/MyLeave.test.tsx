@@ -8,7 +8,16 @@ const BASE_HANDLERS = {
   '/api/leave-balances': { body: [] },
   '/api/leave-requests': { body: [] },
   '/api/leave-types': {
-    body: [{ id: 1, libelle: 'Congé payé', couleur: '#0288D1', deduit_du_solde: true }],
+    body: [
+      {
+        id: 1,
+        libelle: 'Congé payé',
+        couleur: '#0288D1',
+        deduit_du_solde: true,
+        employee_requestable: true,
+        certificate_kind: 'conge_paye',
+      },
+    ],
   },
 }
 
@@ -72,5 +81,46 @@ describe('MyLeave', () => {
 
     expect(await screen.findByText('Nouvelle demande')).toBeInTheDocument()
     expect(screen.queryByText('Pour qui ?')).not.toBeInTheDocument()
+  })
+
+  it('hides HR-only leave types (e.g. Exceptionnel) from the type picker', async () => {
+    mockFetch({
+      ...BASE_HANDLERS,
+      '/api/leave-types': {
+        body: [
+          {
+            id: 1,
+            libelle: 'Congé payé',
+            couleur: '#0288D1',
+            deduit_du_solde: true,
+            employee_requestable: true,
+            certificate_kind: 'conge_paye',
+          },
+          {
+            id: 2,
+            libelle: 'Exceptionnel (mariage/naissance/décès)',
+            couleur: '#546E7A',
+            deduit_du_solde: false,
+            employee_requestable: false,
+            certificate_kind: null,
+          },
+        ],
+      },
+      '/api/auth/me': {
+        body: {
+          id: 6,
+          email: 'employee@arihafroid.ma',
+          role: 'employee',
+          employee_id: 12,
+          department_id: null,
+        },
+      },
+    })
+
+    renderMyLeave()
+
+    await screen.findByText('Nouvelle demande')
+    expect(screen.queryByRole('option', { name: /Exceptionnel/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Congé payé' })).toBeInTheDocument()
   })
 })

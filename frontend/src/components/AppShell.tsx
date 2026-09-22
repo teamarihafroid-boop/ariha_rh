@@ -4,13 +4,17 @@ import { useAuth } from '../lib/auth-context'
 import type { Role } from '../lib/api'
 import { NotificationBell } from './NotificationBell'
 import {
+  IconBriefcase,
   IconCalendar,
   IconClipboard,
   IconClose,
-  IconFlag,
+  IconGauge,
+  IconIdCard,
+  IconKanban,
   IconLogout,
   IconMenu,
-  IconTag,
+  IconSettings,
+  IconSitemap,
   IconUpload,
   IconUsers,
 } from './icons'
@@ -35,10 +39,26 @@ interface NavSection {
 const NAV_BY_ROLE: Record<Role, NavSection[]> = {
   hr: [
     {
+      title: 'Collaborateurs',
+      items: [
+        { to: '/hr/collaborateurs', label: 'Fiche employés', icon: IconIdCard },
+        { to: '/hr/organigramme', label: 'Organigramme', icon: IconSitemap },
+      ],
+    },
+    {
+      title: 'Recrutement',
+      items: [
+        { to: '/hr/recrutement/offres', label: 'Offres', icon: IconBriefcase },
+        { to: '/hr/recrutement/candidats', label: 'Candidats', icon: IconUsers },
+        { to: '/hr/recrutement/pipeline', label: 'Pipeline', icon: IconKanban },
+      ],
+    },
+    {
       title: 'Congés',
       items: [
         { to: '/hr/demandes', label: 'Demandes de congé', icon: IconClipboard },
         { to: '/hr/calendrier', label: 'Calendrier', icon: IconCalendar },
+        { to: '/hr/soldes', label: 'Soldes de congés', icon: IconGauge },
       ],
     },
     {
@@ -46,17 +66,27 @@ const NAV_BY_ROLE: Record<Role, NavSection[]> = {
       items: [{ to: '/hr/presence', label: 'Présence', icon: IconUpload }],
     },
     {
-      title: 'Paramètres',
+      items: [{ to: '/hr/parametres', label: 'Paramètres', icon: IconSettings }],
+    },
+  ],
+  dg: [
+    {
       items: [
-        { to: '/hr/parametres/responsables', label: 'Responsables congés', icon: IconUsers },
-        { to: '/hr/parametres/types-conge', label: 'Types de congé', icon: IconTag },
-        { to: '/hr/parametres/feries', label: 'Jours fériés', icon: IconFlag },
-        { to: '/hr/parametres/codes-presence', label: 'Codes de présence', icon: IconTag },
+        { to: '/dg/collaborateurs', label: 'Collaborateurs', icon: IconIdCard },
+        { to: '/dg/organigramme', label: 'Organigramme', icon: IconSitemap },
+        { to: '/dg/recrutement', label: 'Recrutement', icon: IconBriefcase },
+        { to: '/dg/conges', label: 'Congés', icon: IconCalendar },
       ],
     },
   ],
-  dg: [{ items: [{ to: '/dg/conges', label: 'Congés', icon: IconCalendar }] }],
-  employee: [{ items: [{ to: '/mon-conge', label: 'Mon congé', icon: IconCalendar }] }],
+  employee: [
+    {
+      items: [
+        { to: '/mon-profil', label: 'Mon profil', icon: IconIdCard },
+        { to: '/mon-conge', label: 'Mon congé', icon: IconCalendar },
+      ],
+    },
+  ],
 }
 
 function BrandMark() {
@@ -90,7 +120,8 @@ function NavContent({ onNavigate, bell = false }: { onNavigate?: () => void; bel
             )}
             <div className="space-y-0.5">
               {section.items.map((item) => {
-                const active = location.pathname === item.to
+                const active =
+                  location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
                 const ItemIcon = item.icon
                 return (
                   <Link
@@ -138,6 +169,7 @@ function NavContent({ onNavigate, bell = false }: { onNavigate?: () => void; bel
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const location = useLocation()
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -148,22 +180,30 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Mobile drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setDrawerOpen(false)} />
-          <div className="relative flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl">
-            <button
-              onClick={() => setDrawerOpen(false)}
-              aria-label="Fermer le menu"
-              className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              <IconClose className="h-5 w-5" />
-            </button>
-            <NavContent onNavigate={() => setDrawerOpen(false)} />
-          </div>
+      {/* Mobile drawer — always mounted so both the open and close motions
+          can animate; toggled purely via opacity/transform. */}
+      <div
+        className={`fixed inset-0 z-50 transition-opacity duration-200 lg:hidden ${
+          drawerOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        aria-hidden={!drawerOpen}
+      >
+        <div className="absolute inset-0 bg-slate-900/40" onClick={() => setDrawerOpen(false)} />
+        <div
+          className={`relative flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-200 ${
+            drawerOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <button
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Fermer le menu"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <IconClose className="h-5 w-5" />
+          </button>
+          <NavContent onNavigate={() => setDrawerOpen(false)} />
         </div>
-      )}
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
@@ -172,7 +212,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               onClick={() => setDrawerOpen(true)}
               aria-label="Ouvrir le menu"
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+              className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100"
             >
               <IconMenu className="h-5 w-5" />
             </button>
@@ -182,7 +222,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
-          <div className="mx-auto max-w-5xl">{children}</div>
+          {/* Keyed by route so each page fades in instead of snapping into
+              place — the only per-page-navigation transition this app has. */}
+          <div
+            key={location.pathname}
+            className="mx-auto max-w-5xl animate-[fadeIn_180ms_ease-out]"
+          >
+            {children}
+          </div>
         </main>
       </div>
     </div>
