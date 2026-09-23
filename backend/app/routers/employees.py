@@ -21,6 +21,11 @@ from app.schemas.employee import (
     EmployeeCreate,
     EmployeeDocumentOut,
     EmployeeEquipmentCreate,
+    EmployeeImportConfirmRequest,
+    EmployeeImportPreviewOut,
+    EmployeeImportPreviewRow,
+    EmployeeImportResultOut,
+    EmployeeImportSkipped,
     EmployeeLite,
     EmployeeOut,
     EmployeeUpdate,
@@ -28,7 +33,14 @@ from app.schemas.employee import (
     ProbationAlertOut,
     ProbationEvaluationCreate,
 )
-from app.services import audit_service, contract_service, employee_service, storage_service
+from app.services import (
+    attendance_service,
+    audit_service,
+    contract_service,
+    employee_import_service,
+    employee_service,
+    storage_service,
+)
 
 router = APIRouter(prefix="/api/employees", tags=["employees"])
 
@@ -214,6 +226,96 @@ def get_org_chart(
     db: Session = Depends(get_db),
 ):
     return employee_service.build_org_chart(db)
+
+
+# ------------------------------------------------------------ bulk import --
+
+
+@router.get("/import/template")
+def download_import_template(
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    content = employee_import_service.build_template_xlsx(db)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="modele_collaborateurs.xlsx"'},
+    )
+
+
+@router.post(
+    "/import/upload", response_model=EmployeeImportPreviewOut, dependencies=[Depends(verify_csrf)]
+)
+async def upload_employee_import(
+    file: UploadFile = File(...),
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    content = await file.read()
+    try:
+        _, rows = attendance_service.read_table(content, file.filename or "")
+    except attendance_service.AttendanceServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    parsed = employee_import_service.parse_rows(db, rows)
+    token = attendance_service.store_upload(content, file.filename or "import")
+    preview_rows = [
+        EmployeeImportPreviewRow(
+            row_number=r.row_number,
+            display=r.display,
+            errors=r.errors,
+            warnings=r.warnings,
+            ok=r.data is not None,
+        )
+        for r in parsed
+    ]
+    return EmployeeImportPreviewOut(
+        token=token,
+        rows=preview_rows,
+        nb_valid=sum(1 for r in parsed if r.data is not None),
+        nb_errors=sum(1 for r in parsed if r.data is None),
+    )
+
+
+@router.post(
+    "/import/confirm", response_model=EmployeeImportResultOut, dependencies=[Depends(verify_csrf)]
+)
+def confirm_employee_import(
+    payload: EmployeeImportConfirmRequest,
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    upload = attendance_service.load_upload(payload.token)
+    if upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le fichier importé a expiré (15 min) — veuillez le renvoyer.",
+        )
+    content, filename = upload
+    try:
+        _, rows = attendance_service.read_table(content, filename)
+    except attendance_service.AttendanceServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    parsed = employee_import_service.parse_rows(db, rows)
+    outcome = employee_import_service.create_employees(db, parsed)
+    attendance_service.discard_upload(payload.token)
+
+    audit_service.log(
+        db,
+        entity_type="employee",
+        entity_id=0,
+        action="bulk_imported",
+        actor_user_id=current_user.id,
+        actor_email=current_user.email,
+        description=f"{outcome.created} créé(s), {len(outcome.skipped)} ignoré(s)",
+    )
+    db.commit()
+    return EmployeeImportResultOut(
+        created=outcome.created,
+        skipped=[EmployeeImportSkipped(**s) for s in outcome.skipped],
+    )
 
 
 @router.get("/{employee_id}", response_model=EmployeeOut)

@@ -238,6 +238,32 @@ export interface ImportResult {
   noms_non_reconnus: string[]
 }
 
+export interface EmployeeImportPreviewRow {
+  row_number: number
+  display: Record<string, string>
+  errors: string[]
+  warnings: string[]
+  ok: boolean
+}
+
+export interface EmployeeImportPreview {
+  token: string
+  rows: EmployeeImportPreviewRow[]
+  nb_valid: number
+  nb_errors: number
+}
+
+export interface EmployeeImportSkipped {
+  row_number: number
+  display: Record<string, string>
+  reason: string
+}
+
+export interface EmployeeImportResult {
+  created: number
+  skipped: EmployeeImportSkipped[]
+}
+
 export interface EmergencyContact {
   id: number
   nom: string
@@ -579,4 +605,23 @@ export interface UserUpdateInput {
   role: Role
   employee_id: number | null
   is_active: boolean
+}
+
+export interface EmployeeAccountCandidate {
+  id: number
+  full_name: string
+  matricule: string | null
+  department_nom: string | null
+  position_intitule: string | null
+  coverage_note: string | null
+  suggested_email: string
+}
+
+export interface BulkUserCreateResultItem {
+  employee_id: number
+  employee_nom: string
+  user_id: number | null
+  email: string | null
+  password: string | null
+  error: string | null
 }

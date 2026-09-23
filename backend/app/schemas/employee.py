@@ -203,3 +203,33 @@ class OrgChartDepartment(BaseModel):
 class OrgChartOut(BaseModel):
     direction: list[OrgChartNode]
     departements: list[OrgChartDepartment]
+
+
+class EmployeeImportPreviewRow(BaseModel):
+    row_number: int
+    display: dict[str, str]
+    errors: list[str]
+    warnings: list[str]
+    ok: bool
+
+
+class EmployeeImportPreviewOut(BaseModel):
+    token: str
+    rows: list[EmployeeImportPreviewRow]
+    nb_valid: int
+    nb_errors: int
+
+
+class EmployeeImportConfirmRequest(BaseModel):
+    token: str
+
+
+class EmployeeImportSkipped(BaseModel):
+    row_number: int
+    display: dict[str, str]
+    reason: str
+
+
+class EmployeeImportResultOut(BaseModel):
+    created: int
+    skipped: list[EmployeeImportSkipped]

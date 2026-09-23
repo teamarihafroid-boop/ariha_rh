@@ -441,3 +441,97 @@ def test_document_alert_flags_soon_to_expire_document_not_a_fresh_one(
     alerted_ids = {a["employee_id"] for a in resp.json()}
     assert employee_a.id in alerted_ids
     assert employee_b.id not in alerted_ids
+
+
+# ------------------------------------------------------------ bulk import --
+
+
+def _import_csv(nom="Bennani", prenom="Karim", departement="") -> bytes:
+    header = "Matricule,Nom,Prénom,CIN,Date de naissance,Lieu de naissance,Téléphone,Email,Ville,Adresse,Département,Poste,Statut,Type de contrat,Catégorie,CNSS,Salaire de base,Salaire net,Date d'embauche,Équipe"
+    row = f",{nom},{prenom},,,,,,,,{departement},,,,,,,,,"
+    return f"{header}\n{row}\n".encode()
+
+
+def test_hr_can_download_import_template(client, hr_user):
+    login(client, hr_user.email)
+    resp = client.get("/api/employees/import/template")
+    assert resp.status_code == 200
+    assert (
+        resp.headers["content-type"]
+        == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert resp.content[:2] == b"PK"
+
+
+def test_non_hr_cannot_download_import_template(client, dg_user, employee_a_user):
+    for user in (dg_user, employee_a_user):
+        login(client, user.email)
+        assert client.get("/api/employees/import/template").status_code == 403
+
+
+def test_hr_can_preview_and_confirm_bulk_import(client, hr_user):
+    csrf = login(client, hr_user.email)
+
+    preview_resp = client.post(
+        "/api/employees/import/upload",
+        files={"file": ("collaborateurs.csv", _import_csv(), "text/csv")},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert preview_resp.status_code == 200
+    preview = preview_resp.json()
+    assert preview["nb_valid"] == 1
+    assert preview["nb_errors"] == 0
+    assert preview["rows"][0]["ok"] is True
+
+    confirm_resp = client.post(
+        "/api/employees/import/confirm",
+        json={"token": preview["token"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert confirm_resp.status_code == 200
+    result = confirm_resp.json()
+    assert result["created"] == 1
+    assert result["skipped"] == []
+
+    roster = client.get("/api/employees").json()
+    assert any(e["full_name"] == "Karim Bennani" for e in roster)
+
+
+def test_bulk_import_preview_flags_unknown_department(client, hr_user):
+    csrf = login(client, hr_user.email)
+    preview_resp = client.post(
+        "/api/employees/import/upload",
+        files={
+            "file": (
+                "collaborateurs.csv",
+                _import_csv(departement="Département Inexistant"),
+                "text/csv",
+            )
+        },
+        headers={"X-CSRF-Token": csrf},
+    )
+    preview = preview_resp.json()
+    assert preview["nb_valid"] == 0
+    assert preview["nb_errors"] == 1
+    assert any("inconnu" in e for e in preview["rows"][0]["errors"])
+
+
+def test_non_hr_cannot_bulk_import(client, dg_user, employee_a_user):
+    for user in (dg_user, employee_a_user):
+        csrf = login(client, user.email)
+        assert (
+            client.post(
+                "/api/employees/import/upload",
+                files={"file": ("x.csv", _import_csv(), "text/csv")},
+                headers={"X-CSRF-Token": csrf},
+            ).status_code
+            == 403
+        )
+        assert (
+            client.post(
+                "/api/employees/import/confirm",
+                json={"token": "whatever"},
+                headers={"X-CSRF-Token": csrf},
+            ).status_code
+            == 403
+        )

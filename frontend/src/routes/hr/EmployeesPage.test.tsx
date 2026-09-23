@@ -1,8 +1,15 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { mockFetch } from '../../test/mockFetch'
 import { EmployeesPage } from './EmployeesPage'
+
+function UsersPagePlaceholder() {
+  const location = useLocation()
+  const state = location.state as { autoOpenBulk?: boolean } | null
+  return <div>Comptes utilisateurs page — autoOpenBulk={String(state?.autoOpenBulk)}</div>
+}
 
 describe('EmployeesPage', () => {
   it('lists employees with their scan context (matricule, poste, département, statut)', async () => {
@@ -72,5 +79,89 @@ describe('EmployeesPage', () => {
     )
 
     expect(await screen.findByText('Documents à renouveler — 1')).toBeInTheDocument()
+  })
+
+  it('lets HR bulk-import collaborateurs from a preview', async () => {
+    let confirmedToken: string | null = null
+    mockFetch({
+      '/api/departments': { body: [] },
+      '/api/positions': { body: [] },
+      '/api/employee-statuses': { body: [] },
+      '/api/employees': { body: [] },
+      '/api/employees/periode-essai/alertes': { body: [] },
+      '/api/employees/documents/alertes': { body: [] },
+      '/api/employees/import/upload': {
+        body: {
+          token: 'tok-abc',
+          nb_valid: 1,
+          nb_errors: 1,
+          rows: [
+            {
+              row_number: 2,
+              display: { Nom: 'Bennani', Prénom: 'Karim', Département: '' },
+              errors: [],
+              warnings: [],
+              ok: true,
+            },
+            {
+              row_number: 3,
+              display: { Nom: '', Prénom: '', Département: 'Ne Existe Pas' },
+              errors: ['Nom et Prénom sont obligatoires.', "Département inconnu : 'Ne Existe Pas'"],
+              warnings: [],
+              ok: false,
+            },
+          ],
+        },
+      },
+      '/api/employees/import/confirm': (_path, init) => {
+        confirmedToken = init?.body ? JSON.parse(init.body as string).token : null
+        return {
+          body: {
+            created: 1,
+            skipped: [{ row_number: 3, display: {}, reason: 'Nom et Prénom sont obligatoires.' }],
+          },
+        }
+      },
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/hr/collaborateurs']}>
+        <Routes>
+          <Route path="/hr/collaborateurs" element={<EmployeesPage />} />
+          <Route path="/hr/parametres/utilisateurs" element={<UsersPagePlaceholder />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await userEvent.click(await screen.findByText('Importer des collaborateurs'))
+    await screen.findByText('Télécharger le modèle')
+
+    const file = new File(['Nom,Prénom\nKarim,Bennani\n'], 'collaborateurs.csv', {
+      type: 'text/csv',
+    })
+    const dialog = screen.getByRole('dialog')
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement
+    await userEvent.upload(fileInput, file)
+    // Same jsdom quirk as PresencePage's import wizard: a programmatically
+    // set file input doesn't reliably satisfy `required` for a real click.
+    // Also, the page's own search-filter <form> is a different element —
+    // scope to the modal so we submit the right one.
+    fireEvent.submit(dialog.querySelector('form') as HTMLFormElement)
+
+    expect(await screen.findByText(/1 prêt/)).toBeInTheDocument()
+    expect(screen.getByText('Bennani Karim')).toBeInTheDocument()
+    expect(screen.getByText(/Nom et Prénom sont obligatoires/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Confirmer l'import/ }))
+
+    expect(await screen.findByText(/1 collaborateur créé/)).toBeInTheDocument()
+    expect(confirmedToken).toBe('tok-abc')
+
+    // After a successful import, HR shouldn't have to go hunt for the
+    // account-creation page on their own.
+    await userEvent.click(screen.getByRole('button', { name: 'Créer leurs accès maintenant' }))
+    expect(
+      await screen.findByText('Comptes utilisateurs page — autoOpenBulk=true'),
+    ).toBeInTheDocument()
   })
 })

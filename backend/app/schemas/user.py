@@ -47,3 +47,35 @@ class PasswordReset(BaseModel):
         if len(value) < 8:
             raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
         return value
+
+
+class EmployeeAccountCandidateOut(BaseModel):
+    id: int
+    full_name: str
+    matricule: str | None
+    department_nom: str | None
+    position_intitule: str | None
+    coverage_note: str | None
+    suggested_email: str
+
+
+class BulkUserCreateItem(BaseModel):
+    employee_id: int
+    email: EmailStr | None = None
+
+
+class BulkUserCreateRequest(BaseModel):
+    items: list[BulkUserCreateItem]
+
+
+class BulkUserCreateResultItem(BaseModel):
+    employee_id: int
+    employee_nom: str
+    user_id: int | None
+    email: str | None
+    password: str | None
+    error: str | None
+
+
+class BulkUserCreateResultOut(BaseModel):
+    results: list[BulkUserCreateResultItem]

@@ -8,7 +8,15 @@ from app.dependencies import AuthUser, require_role, verify_csrf
 from app.models import Employee, User
 from app.models.enums import UserRole
 from app.schemas.employee import EmployeeLite
-from app.schemas.user import PasswordReset, UserCreate, UserOut, UserUpdate
+from app.schemas.user import (
+    BulkUserCreateRequest,
+    BulkUserCreateResultOut,
+    EmployeeAccountCandidateOut,
+    PasswordReset,
+    UserCreate,
+    UserOut,
+    UserUpdate,
+)
 from app.services import audit_service, employee_service, user_service
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -62,6 +70,41 @@ def list_employees_without_account(
     return [
         employee_service.serialize_employee_lite(e) for e in employees if e.id not in linked_ids
     ]
+
+
+@router.get("/account-candidates", response_model=list[EmployeeAccountCandidateOut])
+def list_account_candidates(
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    return user_service.list_account_candidates(db)
+
+
+@router.post(
+    "/bulk",
+    response_model=BulkUserCreateResultOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_csrf)],
+)
+def bulk_create_users(
+    payload: BulkUserCreateRequest,
+    current_user: AuthUser = Depends(require_role(UserRole.HR)),
+    db: Session = Depends(get_db),
+):
+    results = user_service.bulk_create_users(db, payload.items)
+    for r in results:
+        if r.error is None and r.user_id is not None:
+            audit_service.log(
+                db,
+                entity_type="user",
+                entity_id=r.user_id,
+                action="created",
+                actor_user_id=current_user.id,
+                actor_email=current_user.email,
+                description=f"{r.email} (employee) — création groupée",
+            )
+    db.commit()
+    return BulkUserCreateResultOut(results=results)
 
 
 @router.post(

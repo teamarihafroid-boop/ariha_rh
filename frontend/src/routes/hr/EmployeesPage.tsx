@@ -7,6 +7,8 @@ import {
   type DocumentAlert,
   type Employee,
   type EmployeeFormInput,
+  type EmployeeImportPreview,
+  type EmployeeImportResult,
   type EmployeeLite,
   type EmployeeStatus,
   type Position,
@@ -49,6 +51,12 @@ export function EmployeesPage() {
   const [createAccount, setCreateAccount] = useState(false)
   const [accountEmail, setAccountEmail] = useState('')
   const [accountPassword, setAccountPassword] = useState('')
+
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importPreview, setImportPreview] = useState<EmployeeImportPreview | null>(null)
+  const [importResult, setImportResult] = useState<EmployeeImportResult | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
 
   const loadReference = async () => {
     const [depts, poss, stats] = await Promise.all([
@@ -172,11 +180,58 @@ export function EmployeesPage() {
     }
   }
 
+  const resetImport = () => {
+    setShowImport(false)
+    setImportFile(null)
+    setImportPreview(null)
+    setImportResult(null)
+  }
+
+  const analyzeImport = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!importFile) return
+    setImportBusy(true)
+    setError(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', importFile)
+      const preview = await api.upload<EmployeeImportPreview>('/employees/import/upload', formData)
+      setImportPreview(preview)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur.')
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  const confirmImport = async () => {
+    if (!importPreview) return
+    setImportBusy(true)
+    setError(null)
+    try {
+      const result = await api.post<EmployeeImportResult>('/employees/import/confirm', {
+        token: importPreview.token,
+      })
+      setImportResult(result)
+      setImportPreview(null)
+      await loadEmployees()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erreur.')
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <PageHeader title="Collaborateurs" subtitle="Fiches employés, recherche et création." />
-        <Button onClick={() => setShowCreate(true)}>Nouveau collaborateur</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowImport(true)}>
+            Importer des collaborateurs
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>Nouveau collaborateur</Button>
+        </div>
       </div>
       <ErrorBanner message={error} />
       {warning && (
@@ -365,6 +420,159 @@ export function EmployeesPage() {
               <Button type="submit">Créer</Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {showImport && (
+        <Modal
+          title="Importer des collaborateurs"
+          onClose={resetImport}
+          maxWidthClassName="max-w-3xl"
+        >
+          {importResult ? (
+            <div>
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                {importResult.created} collaborateur{importResult.created > 1 ? 's' : ''} créé
+                {importResult.created > 1 ? 's' : ''}.
+              </div>
+              {importResult.skipped.length > 0 && (
+                <div className="mb-4">
+                  <div className="mb-2 text-sm font-medium text-amber-800">
+                    {importResult.skipped.length} ligne{importResult.skipped.length > 1 ? 's' : ''}{' '}
+                    ignorée{importResult.skipped.length > 1 ? 's' : ''} :
+                  </div>
+                  <ul className="space-y-1 text-sm text-slate-600">
+                    {importResult.skipped.map((s) => (
+                      <li key={s.row_number} className="rounded-lg bg-amber-50 px-3 py-2">
+                        Ligne {s.row_number} — {s.display['Nom']} {s.display['Prénom']} : {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {importResult.created > 0 && (
+                <p className="mb-4 text-sm text-slate-600">
+                  Ces collaborateurs n&apos;ont pas encore d&apos;accès à l&apos;application. Seuls
+                  ceux qui ne sont pas couverts par un responsable congé de leur département en ont
+                  vraiment besoin.
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={resetImport}>
+                  Fermer
+                </Button>
+                {importResult.created > 0 && (
+                  <Button
+                    onClick={() =>
+                      navigate('/hr/parametres/utilisateurs', { state: { autoOpenBulk: true } })
+                    }
+                  >
+                    Créer leurs accès maintenant
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="mb-3 text-sm text-slate-600">
+                Téléchargez le modèle, remplissez-le (une ligne par collaborateur), puis importez-le
+                ici. Les noms de département/poste doivent correspondre exactement à ceux listés
+                dans l'onglet de référence du modèle.
+              </p>
+              <a
+                href="/api/employees/import/template"
+                target="_blank"
+                rel="noreferrer"
+                className="mb-4 inline-block rounded-lg bg-slate-100 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-200"
+              >
+                Télécharger le modèle
+              </a>
+
+              {!importPreview && (
+                <form onSubmit={analyzeImport} className="flex flex-wrap items-end gap-3">
+                  <Field label="Fichier (.xlsx ou .csv)" className="flex-1">
+                    <input
+                      type="file"
+                      required
+                      accept=".xlsx,.csv"
+                      onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                      className="block text-sm text-slate-700"
+                    />
+                  </Field>
+                  <Button type="submit" disabled={!importFile || importBusy}>
+                    {importBusy ? 'Analyse…' : 'Analyser le fichier'}
+                  </Button>
+                </form>
+              )}
+
+              {importPreview && (
+                <div>
+                  <p className="mb-3 text-sm text-slate-600">
+                    {importPreview.nb_valid} prêt{importPreview.nb_valid > 1 ? 's' : ''}
+                    {importPreview.nb_errors > 0 &&
+                      `, ${importPreview.nb_errors} à corriger (ignoré${importPreview.nb_errors > 1 ? 's' : ''} si vous continuez)`}
+                    .
+                  </p>
+                  <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200">
+                    <Table>
+                      <thead className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2">Ligne</th>
+                          <th className="px-3 py-2">Nom</th>
+                          <th className="px-3 py-2">Département</th>
+                          <th className="px-3 py-2">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreview.rows.map((r) => (
+                          <tr
+                            key={r.row_number}
+                            className="border-b border-slate-100 last:border-0"
+                          >
+                            <td className="px-3 py-2 text-slate-500">{r.row_number}</td>
+                            <td className="px-3 py-2 text-slate-800">
+                              {r.display['Nom']} {r.display['Prénom']}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600">{r.display['Département']}</td>
+                            <td className="px-3 py-2">
+                              {r.ok ? (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                                  Prêt
+                                </span>
+                              ) : (
+                                <span
+                                  className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700"
+                                  title={r.errors.join(' ')}
+                                >
+                                  {r.errors.join(' ')}
+                                </span>
+                              )}
+                              {r.warnings.length > 0 && (
+                                <div className="mt-0.5 text-xs text-amber-600">
+                                  {r.warnings.join(' ')}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <Button variant="secondary" onClick={resetImport}>
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={confirmImport}
+                      disabled={importBusy || importPreview.nb_valid === 0}
+                    >
+                      {importBusy ? 'Import…' : `Confirmer l'import (${importPreview.nb_valid})`}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </Modal>
       )}
     </div>
